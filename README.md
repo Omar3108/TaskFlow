@@ -10,8 +10,8 @@ drag and drop, roles and per-resource authorization.
 
 ## Tech stack
 
-- **Backend:** Java 21, Spring Boot 3, Spring Data JPA, PostgreSQL, Flyway
-- **Frontend:** React, TypeScript, Vite, Tailwind CSS
+- **Backend:** Java 21, Spring Boot 3, Spring Security (JWT), Spring Data JPA, PostgreSQL, Flyway
+- **Frontend:** React, TypeScript, Vite, React Router, TanStack Query, React Hook Form + Zod, Tailwind CSS
 - **Tooling:** Docker Compose, GitHub Actions, Testcontainers, Vitest
 
 ## Running locally
@@ -19,11 +19,11 @@ drag and drop, roles and per-resource authorization.
 Requirements: JDK 21+, Node.js 26, Docker.
 
 ```bash
-cp .env.example .env          # optional: the defaults work for local development
+cp .env.example .env          # required: local settings and the JWT signing key
 docker compose up -d          # PostgreSQL
 
 cd backend
-./mvnw spring-boot:run        # API on http://localhost:8080 (health: /actuator/health)
+./mvnw spring-boot:run        # API on http://localhost:8080 (docs: /swagger-ui)
 
 cd ../frontend
 npm install

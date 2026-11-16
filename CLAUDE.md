@@ -35,10 +35,12 @@ enough to defend it in technical interviews.
 For these, provide only the structure with `// TODO` and an explanation of what each piece
 must do. Then review his code like a pull request (bugs, security, best practices):
 
-- Spring Security configuration and the JWT filter (`SecurityConfig`,
-  `JwtAuthenticationFilter`, the token service).
 - The logic that moves cards between columns and recalculates positions.
 - Optimistic locking (`@Version`) for concurrent card edits, and its integration test.
+
+Spring Security and the JWT filter were originally on this list. In phase 1 (2026-11-15) Omar
+asked Claude to write them and explain the reasoning afterwards, so that code is Claude's. The
+two items above are still Omar's unless he says otherwise.
 
 ## Stack
 
@@ -59,6 +61,9 @@ Environment notes:
 - `frontend/package.json` overrides `minimatch` to `^11.0.8` inside
   `@typescript-eslint/typescript-estree` (GHSA-g3hv-75wg-m249). Remove the override once
   `typescript-eslint` depends on a patched version.
+- The repository `.env` is read by docker-compose, by the backend (`spring.config.import`) and
+  by `vite.config.ts`. On Omar's machine port 8080 is used by another project, so his local
+  `.env` sets `PORT=8090` and `VITE_API_PROXY_TARGET=http://localhost:8090`.
 - Spring Initializr no longer offers Boot 3.x, so `pom.xml` is maintained by hand. Migrating to
   Boot 4 is a documented "next step", not part of the current scope.
 
@@ -83,6 +88,16 @@ Environment notes:
   OWNER also changes roles and renames/deletes the workspace.
 - **Deletes:** hard delete with cascade. **Search:** per board, `ILIKE` on title/description.
   A card has a single assignee. Labels belong to a board.
+- **Auth internals:** the JWT filter builds the principal (`AuthenticatedUser`: id + e-mail)
+  from token claims with no database query; there are no global authorities. Refresh tokens are
+  opaque random values (not JWTs), single-use, with reuse detection that revokes every session
+  of the user. Login always runs BCrypt and returns one generic error.
+- **Same-origin API:** the frontend calls relative `/api/v1` URLs. Vite proxies `/api` in
+  development; the production host must rewrite it. Browsers still send an `Origin` header on
+  proxied POSTs, so the frontend origin must be listed in `CORS_ALLOWED_ORIGINS` (remember this
+  when deploying).
+- **Naming:** tables are plural snake_case (`users`, `refresh_tokens`). Entity timestamps are
+  set in `@PrePersist`/`@PreUpdate` so they exist before the first flush.
 - **Schema:** Flyway owns it (`ddl-auto: validate`), one migration set per phase. Enums are
   stored as strings. The `activity` table is deferred to the extras phase.
 - **API:** prefix `/api/v1`; nested routes to create/list (`/boards/{id}/columns`), flat routes
@@ -97,7 +112,7 @@ Environment notes:
 
 ```bash
 docker compose up -d                 # PostgreSQL on localhost:5432
-cd backend && ./mvnw spring-boot:run # API on http://localhost:8080
+cd backend && ./mvnw spring-boot:run # API on http://localhost:8080 (or PORT from .env); docs at /swagger-ui
 cd backend && ./mvnw verify          # build + tests (needs Docker running) + JaCoCo report
 cd frontend && npm run dev           # UI on http://localhost:5173
 cd frontend && npm run lint && npm run format:check && npm run test && npm run build
@@ -110,8 +125,8 @@ Backend tests whose class name ends in `Test` are run by Surefire. Integration t
 
 | # | Phase | Status |
 |---|---|---|
-| 0 | Setup: monorepo, Spring Boot, Vite, compose, Flyway, CI | Done — pending merge |
-| 1 | Authentication (security code written by Omar) | Not started |
+| 0 | Setup: monorepo, Spring Boot, Vite, compose, Flyway, CI | Done |
+| 1 | Authentication (security code written by Claude at Omar's request) | Done — pending merge |
 | 2 | Workspaces and members | Not started |
 | 3 | Boards, columns and cards (move logic + optimistic locking by Omar) | Not started |
 | 4 | Labels, comments, search and filters | Not started |

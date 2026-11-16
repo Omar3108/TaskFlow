@@ -1,9 +1,21 @@
 import { render, screen } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import App from './App'
 
-test('renders the application name', () => {
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+test('a visitor without a session lands on the login page', async () => {
+  // The app checks for an existing session on startup; the server answers "no session".
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>().mockResolvedValue(new Response('{"status":401}', { status: 401 })),
+  )
+
   render(<App />)
 
-  expect(screen.getByRole('heading', { name: 'TaskFlow' })).toBeInTheDocument()
+  expect(
+    await screen.findByRole('heading', { name: 'Sign in to your account' }),
+  ).toBeInTheDocument()
 })

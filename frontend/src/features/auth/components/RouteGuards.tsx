@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { useAuth } from '../AuthContext'
+import { useRedirectTarget, type RedirectState } from '../redirect'
 
 function SessionLoading() {
   return (
@@ -17,8 +18,9 @@ export function ProtectedRoute() {
   // Wait for the session check: redirecting now would flash the login page on every reload.
   if (status === 'loading') return <SessionLoading />
   if (status === 'unauthenticated') {
-    // Remember where the user was going, to return there after signing in.
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    // Remember where the user was going (an invitation link, for example) to return there.
+    const state: RedirectState = { from: location.pathname }
+    return <Navigate to="/login" replace state={state} />
   }
   return <Outlet />
 }
@@ -26,8 +28,10 @@ export function ProtectedRoute() {
 /** Wraps /login and /register: a signed-in user has nothing to do there. */
 export function PublicOnlyRoute() {
   const { status } = useAuth()
+  const target = useRedirectTarget()
 
   if (status === 'loading') return <SessionLoading />
-  if (status === 'authenticated') return <Navigate to="/" replace />
+  // Reached right after a successful login or registration: continue to the requested page.
+  if (status === 'authenticated') return <Navigate to={target} replace />
   return <Outlet />
 }

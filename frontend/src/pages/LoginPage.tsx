@@ -1,12 +1,9 @@
-import { Link, useLocation, useNavigate } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { LoginForm } from '../features/auth/components/LoginForm'
 import { AuthLayout } from './AuthLayout'
 
 export function LoginPage() {
-  const navigate = useNavigate()
   const location = useLocation()
-  // Set by ProtectedRoute when it redirected an anonymous visitor here.
-  const from = (location.state as { from?: string } | null)?.from ?? '/'
 
   return (
     <AuthLayout
@@ -14,13 +11,19 @@ export function LoginPage() {
       footer={
         <>
           New to TaskFlow?{' '}
-          <Link to="/register" className="font-medium text-indigo-600 hover:underline">
+          {/* Pass the router state along so "where I was going" survives switching pages. */}
+          <Link
+            to="/register"
+            state={location.state}
+            className="font-medium text-indigo-600 hover:underline"
+          >
             Create an account
           </Link>
         </>
       }
     >
-      <LoginForm onSuccess={() => navigate(from, { replace: true })} />
+      {/* No navigation here: once the session exists, PublicOnlyRoute redirects. */}
+      <LoginForm />
     </AuthLayout>
   )
 }

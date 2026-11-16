@@ -9,7 +9,7 @@ import { useAuth } from '../AuthContext'
 import { applyApiError } from '../formErrors'
 import { registerSchema, type RegisterValues } from '../schemas'
 
-export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
+export function RegisterForm({ onSuccess }: { onSuccess?: () => void }) {
   const { register: registerAccount } = useAuth()
   const [formError, setFormError] = useState<string | null>(null)
 

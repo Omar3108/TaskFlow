@@ -56,6 +56,9 @@ Environment notes:
 
 - The local JDK is 25; the build targets Java 21 (`java.version`), and CI/Docker use Temurin 21.
 - TypeScript is pinned to 6.x because `typescript-eslint` does not support TypeScript 7 yet.
+- `frontend/package.json` overrides `minimatch` to `^11.0.8` inside
+  `@typescript-eslint/typescript-estree` (GHSA-g3hv-75wg-m249). Remove the override once
+  `typescript-eslint` depends on a patched version.
 - Spring Initializr no longer offers Boot 3.x, so `pom.xml` is maintained by hand. Migrating to
   Boot 4 is a documented "next step", not part of the current scope.
 

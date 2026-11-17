@@ -1,9 +1,9 @@
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { RegisterForm } from '../features/auth/components/RegisterForm'
 import { AuthLayout } from './AuthLayout'
 
 export function RegisterPage() {
-  const navigate = useNavigate()
+  const location = useLocation()
 
   return (
     <AuthLayout
@@ -11,13 +11,17 @@ export function RegisterPage() {
       footer={
         <>
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-indigo-600 hover:underline">
+          <Link
+            to="/login"
+            state={location.state}
+            className="font-medium text-indigo-600 hover:underline"
+          >
             Sign in
           </Link>
         </>
       }
     >
-      <RegisterForm onSuccess={() => navigate('/', { replace: true })} />
+      <RegisterForm />
     </AuthLayout>
   )
 }

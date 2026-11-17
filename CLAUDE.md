@@ -86,6 +86,14 @@ Environment notes:
 - **Roles:** exactly one OWNER per workspace (no ownership transfer in the MVP). MEMBER works
   with cards and comments; ADMIN also manages boards, columns, labels, members and invitations;
   OWNER also changes roles and renames/deletes the workspace.
+- **Member rules:** only the OWNER changes roles (between ADMIN and MEMBER). Removing someone
+  requires strictly outranking them, so an ADMIN cannot remove another ADMIN. Anyone but the
+  OWNER can leave. A partial unique index guarantees one OWNER per workspace.
+- **Invitation rules:** ADMIN+ can invite; only the OWNER can invite as ADMIN. Statuses:
+  PENDING, ACCEPTED, DECLINED, REVOKED, EXPIRED; expiry (7 days) is evaluated on read, with no
+  scheduled job. Accepting requires being signed in with the invited e-mail: a valid link used
+  by another account gets 403, anything else invalid gets 404. Invitees can also accept or
+  decline from `/users/me/invitations`.
 - **Deletes:** hard delete with cascade. **Search:** per board, `ILIKE` on title/description.
   A card has a single assignee. Labels belong to a board.
 - **Auth internals:** the JWT filter builds the principal (`AuthenticatedUser`: id + e-mail)
@@ -120,14 +128,17 @@ cd frontend && npm run lint && npm run format:check && npm run test && npm run b
 
 Backend tests whose class name ends in `Test` are run by Surefire. Integration tests extend
 `AbstractIntegrationTest` (shared PostgreSQL Testcontainer) and are named `*IntegrationTest`.
+Tests that need signed-in users extend `ApiIntegrationTest` (`registerUser`, `perform(user, …)`).
+Frontend component tests mock the feature's `api.ts` module with `vi.mock` and render through
+`src/test/renderWithProviders.tsx`.
 
 ## Phase status
 
 | # | Phase | Status |
 |---|---|---|
 | 0 | Setup: monorepo, Spring Boot, Vite, compose, Flyway, CI | Done |
-| 1 | Authentication (security code written by Claude at Omar's request) | Done — pending merge |
-| 2 | Workspaces and members | Not started |
+| 1 | Authentication (security code written by Claude at Omar's request) | Done |
+| 2 | Workspaces and members | Done — pending merge |
 | 3 | Boards, columns and cards (move logic + optimistic locking by Omar) | Not started |
 | 4 | Labels, comments, search and filters | Not started |
 | 5 | Frontend polish | Not started |

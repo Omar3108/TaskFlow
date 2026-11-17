@@ -3,6 +3,7 @@ package com.taskflow.board;
 import com.taskflow.board.dto.BoardDetailResponse;
 import com.taskflow.board.dto.BoardRequest;
 import com.taskflow.board.dto.BoardResponse;
+import com.taskflow.board.dto.CreateBoardRequest;
 import com.taskflow.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -41,11 +42,11 @@ public class BoardController {
 
     @PostMapping("/workspaces/{workspaceId}/boards")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a board (admin or owner)")
+    @Operation(summary = "Create a board (admin or owner); it starts with three columns unless defaultColumns is false")
     public BoardResponse create(
             @AuthenticationPrincipal AuthenticatedUser user,
             @PathVariable UUID workspaceId,
-            @Valid @RequestBody BoardRequest request) {
+            @Valid @RequestBody CreateBoardRequest request) {
         return boardService.create(workspaceId, user.id(), request);
     }
 

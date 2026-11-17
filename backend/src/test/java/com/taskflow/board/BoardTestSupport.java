@@ -32,8 +32,12 @@ public abstract class BoardTestSupport extends WorkspaceTestSupport {
         return new Team(workspaceId, owner, admin, member);
     }
 
+    /** An empty board (no default columns), so tests control exactly which columns exist. */
     protected UUID createBoard(TestUser user, UUID workspaceId, String name) throws Exception {
-        return idOf(perform(user, post("/api/v1/workspaces/{id}/boards", workspaceId), Map.of("name", name))
+        return idOf(perform(
+                        user,
+                        post("/api/v1/workspaces/{id}/boards", workspaceId),
+                        Map.of("name", name, "defaultColumns", false))
                 .andExpect(status().isCreated()));
     }
 

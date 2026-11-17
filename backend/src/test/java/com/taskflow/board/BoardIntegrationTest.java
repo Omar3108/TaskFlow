@@ -97,6 +97,27 @@ class BoardIntegrationTest extends BoardTestSupport {
     }
 
     @Test
+    void newBoardStartsWithThreeColumnsUnlessAskedOtherwise() throws Exception {
+        Team team = createTeam();
+
+        UUID withDefaults = idOf(perform(
+                        team.owner(), post("/api/v1/workspaces/{id}/boards", team.workspaceId()), Map.of("name", "Roadmap"))
+                .andExpect(status().isCreated()));
+        assertThat(columnNames(team.member(), withDefaults)).containsExactly("To do", "In progress", "Done");
+
+        UUID explicit = idOf(perform(
+                        team.owner(),
+                        post("/api/v1/workspaces/{id}/boards", team.workspaceId()),
+                        Map.of("name", "Sprint", "defaultColumns", true))
+                .andExpect(status().isCreated()));
+        assertThat(columnNames(team.member(), explicit)).hasSize(3);
+
+        // Columns added later go after the default ones.
+        createColumn(team.owner(), withDefaults, "Archived");
+        assertThat(columnNames(team.member(), withDefaults)).containsExactly("To do", "In progress", "Done", "Archived");
+    }
+
+    @Test
     void emptyBoardHasNoColumns() throws Exception {
         Team team = createTeam();
         UUID boardId = createBoard(team.owner(), team.workspaceId(), "Empty");

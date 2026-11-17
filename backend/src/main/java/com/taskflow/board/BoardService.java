@@ -5,9 +5,11 @@ import com.taskflow.board.dto.BoardDetailResponse;
 import com.taskflow.board.dto.BoardDetailResponse.ColumnWithCards;
 import com.taskflow.board.dto.BoardRequest;
 import com.taskflow.board.dto.BoardResponse;
+import com.taskflow.board.dto.CreateBoardRequest;
 import com.taskflow.card.CardMapper;
 import com.taskflow.card.CardRepository;
 import com.taskflow.card.dto.CardSummaryResponse;
+import com.taskflow.common.ordering.PositionCalculator;
 import com.taskflow.workspace.WorkspaceAccessService;
 import com.taskflow.workspace.WorkspaceMember;
 import com.taskflow.workspace.WorkspaceRole;
@@ -20,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class BoardService {
+
+    /** Columns a new board starts with, unless the client asks for an empty board. */
+    static final List<String> DEFAULT_COLUMNS = List.of("To do", "In progress", "Done");
 
     private final BoardRepository boardRepository;
     private final BoardColumnRepository columnRepository;
@@ -55,10 +60,17 @@ public class BoardService {
     }
 
     @Transactional
-    public BoardResponse create(UUID workspaceId, UUID userId, BoardRequest request) {
+    public BoardResponse create(UUID workspaceId, UUID userId, CreateBoardRequest request) {
         WorkspaceMember admin = workspaceAccess.requireRole(workspaceId, userId, WorkspaceRole.ADMIN);
         Board board = boardRepository.save(
                 new Board(admin.getWorkspace(), request.name().trim(), normalize(request.description())));
+        if (request.wantsDefaultColumns()) {
+            for (int i = 0; i < DEFAULT_COLUMNS.size(); i++) {
+                // Same positions a client would get by adding the columns one by one.
+                double position = (i + 1) * PositionCalculator.STEP;
+                columnRepository.save(new BoardColumn(board, DEFAULT_COLUMNS.get(i), position));
+            }
+        }
         return boardMapper.toBoardResponse(board);
     }
 

@@ -40,8 +40,10 @@ delegated, so the code is not his and he needs the reasoning explained to defend
   its integration test: written by a Sonnet subagent at his request (phase 3b, 2026-11-17),
   reviewed by Claude.
 
-Nothing is currently reserved. If Omar reserves a part again, provide only the structure with
-`// TODO` and an explanation, then review his code like a pull request.
+Standing instruction (2026-11-17): in every phase, anything that would have been reserved for
+Omar is written by a Sonnet subagent that makes its own design decisions; Claude reviews the
+result, reruns the tests and explains the decisions in the end-of-phase report. Omar merges the
+pull requests and checks that nothing is broken.
 
 ## Stack
 

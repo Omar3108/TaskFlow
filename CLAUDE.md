@@ -30,17 +30,20 @@ enough to defend it in technical interviews.
 - Every feature ships with its tests in the same phase.
 - No secrets in code. Configuration via environment variables; keep `.env.example` current.
 
-### Parts Omar writes himself
+### Parts originally reserved for Omar
 
-For these, provide only the structure with `// TODO` and an explanation of what each piece
-must do. Then review his code like a pull request (bugs, security, best practices):
+Three parts were meant to be written by Omar with Claude only reviewing. All three were
+delegated, so the code is not his and he needs the reasoning explained to defend it:
 
-- The logic that moves cards between columns and recalculates positions.
-- Optimistic locking (`@Version`) for concurrent card edits, and its integration test.
+- Spring Security and the JWT filter: written by Claude at his request (phase 1, 2026-11-15).
+- The card move logic with position recalculation, and optimistic locking (`@Version`) with
+  its integration test: written by a Sonnet subagent at his request (phase 3b, 2026-11-17),
+  reviewed by Claude.
 
-Spring Security and the JWT filter were originally on this list. In phase 1 (2026-11-15) Omar
-asked Claude to write them and explain the reasoning afterwards, so that code is Claude's. The
-two items above are still Omar's unless he says otherwise.
+Standing instruction (2026-11-17): in every phase, anything that would have been reserved for
+Omar is written by a Sonnet subagent that makes its own design decisions; Claude reviews the
+result, reruns the tests and explains the decisions in the end-of-phase report. Omar merges the
+pull requests and checks that nothing is broken.
 
 ## Stack
 
@@ -80,7 +83,16 @@ Environment notes:
   stored hashed. Real e-mail arrives with the extras.
 - **Ordering:** `position` is `DOUBLE PRECISION` (fractional indexing: a moved card gets the
   midpoint between its neighbours, so a move updates one row).
-- **Optimistic locking:** `version` only on `Card`; sent in the request body; stale → HTTP 409.
+- **Optimistic locking:** `version` only on `Card`; sent in the request body; stale → HTTP 409
+  (checked by hand in `CardService.update`, and by Hibernate at flush for the remaining race).
+  A move does **not** bump the version: `column`, `position` and `updatedAt` are
+  `@OptimisticLock(excluded = true)` and `Card` is `@DynamicUpdate`, so an edit never writes a
+  stale position back. Concurrent moves of one card are last-write-wins.
+- **Moves:** `PositionCalculator.between` uses the midpoint, `next - STEP` at the start and
+  `previous + STEP` at the end. When the gap between the neighbours is exhausted (below `1e-6`,
+  or the midpoint collides), the whole list is rebalanced to multiples of 1024 with one native
+  `UPDATE ... row_number()` statement, which bypasses `@Version`. A drop that changes nothing
+  writes nothing. Invalid targets or neighbours answer 400 with a generic message.
 - **Authorization:** resource → workspace → caller's role, resolved by one
   `WorkspaceAccessService` called explicitly from services. Non-members get **404**, not 403.
 - **Roles:** exactly one OWNER per workspace (no ownership transfer in the MVP). MEMBER works
@@ -112,6 +124,30 @@ Environment notes:
   to operate on a resource (`/cards/{id}`); `PATCH /cards/{id}/move` is a dedicated endpoint
   where the client sends neighbour ids and the server computes the position; errors as
   `ProblemDetail`; pagination with `page`/`size`/`sort`.
+- **Boards, columns, cards:** boards and columns are managed by ADMIN+; every MEMBER works with
+  cards. `GET /boards/{id}` returns the whole board (columns and card summaries, in order) in a
+  fixed number of queries, plus the caller's role. Table `board_columns`, entity `BoardColumn`.
+  New items are appended at `max(position) + 1024`; `PositionCalculator` (`common.ordering`)
+  owns the position maths for both columns and cards.
+- **New boards** start with "To do", "In progress" and "Done" unless `defaultColumns: false`
+  (`CreateBoardRequest`; backend tests create empty boards through `BoardTestSupport`).
+- **Board UI (drag and drop):** dnd-kit (`core`, `sortable`, `utilities`). The placement logic
+  lives in pure functions (`features/boards/dnd.ts`): arrange by index, describe by neighbours
+  (`cardMoveFor`), apply neighbours (`applyCardMove`, also used for the optimistic update).
+  While dragging, `KanbanBoard` keeps a draft tied to the cached board object it came from, so
+  it is ignored as soon as the cache changes (no flash between drop and optimistic update).
+  Moves are optimistic (`optimisticBoardUpdate`: cancel, snapshot, write, rollback, refetch).
+  Space picks up a card with the keyboard, Enter opens it. `BoardPage` is lazy-loaded so
+  dnd-kit stays out of the main bundle.
+- **Card dialog:** loads the full card (`refetchOnWindowFocus: false`, so typing is never
+  reset); a 409 shows a notice with "Load latest version", and the form is keyed by `version`.
+- **Card fields:** title, description, single assignee, due date (no priority; labels arrive in
+  phase 4). Updates (`PATCH`) send every editable field: a missing or null field is cleared.
+  The assignee must be a workspace member (400 otherwise); when a member is removed or leaves,
+  `MemberRemovedEvent` unassigns their cards in the same transaction.
+- **Resource 404s:** a non-member gets the same 404 body as for a missing id ("Board not
+  found", "Column not found", "Card not found"), via `WorkspaceAccessService.requireRole(...,
+  notFoundMessage)`.
 - **Code layout:** package-by-feature in the backend (`auth`, `user`, `workspace`, `board`,
   `card`, `security`, `common`); feature folders in the frontend (`src/app`, `src/features/*`,
   `src/pages`, `src/components/ui`, `src/lib`, `src/types`, `src/test`).
@@ -129,8 +165,11 @@ cd frontend && npm run lint && npm run format:check && npm run test && npm run b
 Backend tests whose class name ends in `Test` are run by Surefire. Integration tests extend
 `AbstractIntegrationTest` (shared PostgreSQL Testcontainer) and are named `*IntegrationTest`.
 Tests that need signed-in users extend `ApiIntegrationTest` (`registerUser`, `perform(user, …)`).
+Board, column and card tests extend `BoardTestSupport` (`createTeam`, `createBoard`,
+`createColumn`, `createCard`, `moveCard`, `cardTitles`).
 Frontend component tests mock the feature's `api.ts` module with `vi.mock` and render through
 `src/test/renderWithProviders.tsx`.
+Shared API-shape builders (`sampleBoard`, `fullCard`, `member`) live in `src/test/fixtures.ts`.
 
 ## Phase status
 
@@ -138,8 +177,8 @@ Frontend component tests mock the feature's `api.ts` module with `vi.mock` and r
 |---|---|---|
 | 0 | Setup: monorepo, Spring Boot, Vite, compose, Flyway, CI | Done |
 | 1 | Authentication (security code written by Claude at Omar's request) | Done |
-| 2 | Workspaces and members | Done — pending merge |
-| 3 | Boards, columns and cards (move logic + optimistic locking by Omar) | Not started |
+| 2 | Workspaces and members | Done |
+| 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | Done — pending merge |
 | 4 | Labels, comments, search and filters | Not started |
 | 5 | Frontend polish | Not started |
 | 6 | Testing (70%+ backend coverage, component tests, Playwright) | Not started |

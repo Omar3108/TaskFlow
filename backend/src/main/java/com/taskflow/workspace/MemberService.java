@@ -7,6 +7,7 @@ import com.taskflow.common.error.ResourceNotFoundException;
 import com.taskflow.workspace.dto.MemberResponse;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,12 +17,17 @@ public class MemberService {
     private final WorkspaceMemberRepository memberRepository;
     private final WorkspaceAccessService accessService;
     private final WorkspaceMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     public MemberService(
-            WorkspaceMemberRepository memberRepository, WorkspaceAccessService accessService, WorkspaceMapper mapper) {
+            WorkspaceMemberRepository memberRepository,
+            WorkspaceAccessService accessService,
+            WorkspaceMapper mapper,
+            ApplicationEventPublisher eventPublisher) {
         this.memberRepository = memberRepository;
         this.accessService = accessService;
         this.mapper = mapper;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -67,7 +73,7 @@ public class MemberService {
                 // A workspace without an owner could never be administered again.
                 throw new ConflictException("The owner cannot leave the workspace; delete it instead");
             }
-            memberRepository.delete(actor);
+            delete(actor);
             return;
         }
 
@@ -80,7 +86,13 @@ public class MemberService {
         if (!outranksTarget) {
             throw new ForbiddenException("You cannot remove a member with the " + target.getRole() + " role");
         }
-        memberRepository.delete(target);
+        delete(target);
+    }
+
+    private void delete(WorkspaceMember member) {
+        memberRepository.delete(member);
+        eventPublisher.publishEvent(
+                new MemberRemovedEvent(member.getWorkspace().getId(), member.getUser().getId()));
     }
 
     private WorkspaceMember findMember(UUID workspaceId, UUID userId) {

@@ -59,6 +59,76 @@ export interface ReceivedInvitation {
   expiresAt: string
 }
 
+export interface Board {
+  id: string
+  workspaceId: string
+  name: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Assignee {
+  id: string
+  displayName: string
+  email: string
+}
+
+/** A card as the board shows it: no description, to keep the board response small. */
+export interface CardSummary {
+  id: string
+  columnId: string
+  title: string
+  position: number
+  assignee: Assignee | null
+  /** ISO date (yyyy-mm-dd). */
+  dueDate: string | null
+  version: number
+}
+
+export interface BoardColumn {
+  id: string
+  name: string
+  position: number
+  /** In display order. */
+  cards: CardSummary[]
+}
+
+/** The whole board, as returned by GET /boards/{id}. */
+export interface BoardDetail {
+  id: string
+  workspaceId: string
+  name: string
+  description: string | null
+  /** Role of the signed-in user in the workspace of this board. */
+  role: WorkspaceRole
+  /** In display order. */
+  columns: BoardColumn[]
+}
+
+/** A column as returned by the column endpoints (without its cards). */
+export interface ColumnSummary {
+  id: string
+  boardId: string
+  name: string
+  position: number
+}
+
+export interface Card {
+  id: string
+  boardId: string
+  columnId: string
+  title: string
+  description: string | null
+  position: number
+  assignee: Assignee | null
+  dueDate: string | null
+  /** Optimistic-locking counter: sent back on edit, a stale value is rejected with 409. */
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
 /** RFC 9457 error body returned by the API for every failure. */
 export interface ProblemDetail {
   status: number

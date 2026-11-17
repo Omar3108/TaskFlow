@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Alert } from '../components/ui/Alert'
 import { useAuth } from '../features/auth/AuthContext'
+import { BoardList } from '../features/boards/components/BoardList'
 import { InvitationPanel } from '../features/workspaces/components/InvitationPanel'
 import { MemberList } from '../features/workspaces/components/MemberList'
 import { RoleBadge } from '../features/workspaces/components/RoleBadge'
@@ -65,9 +66,7 @@ export function WorkspacePage() {
       </div>
 
       <Section title="Boards">
-        <p className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
-          Boards are coming next.
-        </p>
+        <BoardList workspaceId={data.id} role={data.role} />
       </Section>
 
       <Section title="Members">

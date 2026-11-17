@@ -9,10 +9,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /** Shared steps for workspace tests, all performed through the public API. */
-abstract class WorkspaceTestSupport extends ApiIntegrationTest {
+public abstract class WorkspaceTestSupport extends ApiIntegrationTest {
 
     /** A sent invitation: its id and the raw token that only the creation response reveals. */
-    record SentInvitation(UUID id, String token) {
+    public record SentInvitation(UUID id, String token) {
     }
 
     protected UUID createWorkspace(TestUser owner, String name) throws Exception {

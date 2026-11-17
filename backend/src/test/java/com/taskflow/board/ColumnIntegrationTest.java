@@ -9,9 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -125,9 +126,7 @@ class ColumnIntegrationTest extends BoardTestSupport {
         assertThat(columnNames(team.member(), boardId)).containsExactly("First", "Second", "Third");
     }
 
-    /** Enabled in phase 3b, once PositionCalculator.between exists. */
     @Nested
-    @Disabled("Pending PositionCalculator.between (phase 3b)")
     class Move {
 
         @Test
@@ -183,6 +182,34 @@ class ColumnIntegrationTest extends BoardTestSupport {
             moveColumn(team.admin(), first, second, null).andExpect(status().isOk());
 
             assertThat(cardTitles(team.member(), boardId, first)).containsExactly("A", "B");
+        }
+
+        /**
+         * Every iteration drops the last column between the first two, halving the gap between
+         * them. This only keeps working if the board is rebalanced along the way.
+         */
+        @Test
+        void orderSurvivesManyMovesIntoTheSameGap() throws Exception {
+            Team team = createTeam();
+            UUID boardId = createBoard(team.owner(), team.workspaceId(), "Roadmap");
+            List<String> order = new ArrayList<>(List.of("A", "B", "C"));
+            Map<String, UUID> ids = Map.of(
+                    "A", createColumn(team.owner(), boardId, "A"),
+                    "B", createColumn(team.owner(), boardId, "B"),
+                    "C", createColumn(team.owner(), boardId, "C"));
+
+            for (int i = 0; i < 80; i++) {
+                String moved = order.remove(2);
+                moveColumn(team.admin(), ids.get(moved), ids.get(order.get(0)), ids.get(order.get(1)))
+                        .andExpect(status().isOk());
+                order.add(1, moved);
+
+                if (i % 10 == 9) {
+                    assertThat(columnNames(team.member(), boardId))
+                            .as("after %d moves", i + 1)
+                            .containsExactlyElementsOf(order);
+                }
+            }
         }
     }
 }

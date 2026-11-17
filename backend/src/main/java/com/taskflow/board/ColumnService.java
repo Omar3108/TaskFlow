@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ColumnService {
 
+    private static final String WRONG_ORDER = "The previous column must come before the next column";
+
     private final BoardColumnRepository columnRepository;
     private final BoardAccessService boardAccess;
     private final BoardMapper mapper;
@@ -48,28 +50,44 @@ public class ColumnService {
     }
 
     /**
-     * Moves a column between two neighbours of the same board. Only this row is updated.
-     *
-     * <p>Rebalancing (for a gap that can no longer be split) is added in phase 3b, mirroring the
-     * card implementation.
+     * Moves a column between two neighbours of the same board. Normally only this row is
+     * updated; when the gap between the neighbours can no longer be split, the positions of the
+     * whole board are rewritten first.
      */
     @Transactional
     public ColumnResponse move(UUID columnId, UUID userId, MoveColumnRequest request) {
         BoardColumn column = boardAccess.requireColumn(columnId, userId, WorkspaceRole.ADMIN);
         UUID boardId = column.getBoard().getId();
 
-        Double previous = neighbourPosition(request.previousColumnId(), columnId, boardId);
-        Double next = neighbourPosition(request.nextColumnId(), columnId, boardId);
-        if (previous != null && next != null && previous >= next) {
-            throw new BadRequestException("The previous column must come before the next column");
+        BoardColumn previous = resolveNeighbour(request.previousColumnId(), columnId, boardId);
+        BoardColumn next = resolveNeighbour(request.nextColumnId(), columnId, boardId);
+
+        if (previous != null && next != null) {
+            if (previous.getPosition() > next.getPosition()) {
+                throw new BadRequestException(WRONG_ORDER);
+            }
+            if (PositionCalculator.isExhausted(previous.getPosition(), next.getPosition())) {
+                // The rebalance is a bulk statement that clears the persistence context, so
+                // the three columns are read again with their new positions.
+                columnRepository.rebalanceBoard(boardId, PositionCalculator.STEP);
+                column = columnRepository.findById(columnId).orElseThrow();
+                previous = columnRepository.findById(previous.getId()).orElseThrow();
+                next = columnRepository.findById(next.getId()).orElseThrow();
+                // Columns with equal positions are ordered by id, so only now is the real
+                // order known.
+                if (previous.getPosition() >= next.getPosition()) {
+                    throw new BadRequestException(WRONG_ORDER);
+                }
+            }
         }
 
-        column.setPosition(PositionCalculator.between(previous, next));
+        column.setPosition(PositionCalculator.between(
+                previous == null ? null : previous.getPosition(), next == null ? null : next.getPosition()));
         return mapper.toColumnResponse(column);
     }
 
-    /** Position of a neighbour, after checking that it is a different column of the same board. */
-    private Double neighbourPosition(UUID neighbourId, UUID movedColumnId, UUID boardId) {
+    /** A neighbour, after checking that it is a different column of the same board. */
+    private BoardColumn resolveNeighbour(UUID neighbourId, UUID movedColumnId, UUID boardId) {
         if (neighbourId == null) {
             return null;
         }
@@ -78,7 +96,6 @@ public class ColumnService {
         }
         return columnRepository.findById(neighbourId)
                 .filter(neighbour -> neighbour.getBoard().getId().equals(boardId))
-                .map(BoardColumn::getPosition)
                 // Same answer for "does not exist" and "belongs to another board": the caller
                 // may not be allowed to know about that other board.
                 .orElseThrow(() -> new BadRequestException("The neighbour columns must belong to the same board"));

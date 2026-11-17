@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class WorkspaceAccessService {
 
+    private static final String WORKSPACE_NOT_FOUND = "Workspace not found";
+
     private final WorkspaceMemberRepository memberRepository;
 
     public WorkspaceAccessService(WorkspaceMemberRepository memberRepository) {
@@ -30,8 +32,7 @@ public class WorkspaceAccessService {
      */
     @Transactional(readOnly = true)
     public WorkspaceMember requireMember(UUID workspaceId, UUID userId) {
-        return memberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Workspace not found"));
+        return requireMember(workspaceId, userId, WORKSPACE_NOT_FOUND);
     }
 
     /**
@@ -40,10 +41,34 @@ public class WorkspaceAccessService {
      */
     @Transactional(readOnly = true)
     public WorkspaceMember requireRole(UUID workspaceId, UUID userId, WorkspaceRole minimumRole) {
-        WorkspaceMember member = requireMember(workspaceId, userId);
+        return requireRole(workspaceId, userId, minimumRole, WORKSPACE_NOT_FOUND);
+    }
+
+    /**
+     * Variant for resources that live inside a workspace (boards, columns, cards).
+     *
+     * @param notFoundMessage the message the caller uses when the resource itself does not
+     *                        exist, for example "Board not found". A non-member must receive
+     *                        exactly the same response, otherwise the difference between the
+     *                        two messages would reveal which ids exist.
+     */
+    @Transactional(readOnly = true)
+    public WorkspaceMember requireRole(
+            UUID workspaceId, UUID userId, WorkspaceRole minimumRole, String notFoundMessage) {
+        WorkspaceMember member = requireMember(workspaceId, userId, notFoundMessage);
         if (!member.getRole().isAtLeast(minimumRole)) {
             throw new ForbiddenException("This action requires the " + minimumRole + " role");
         }
         return member;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isMember(UUID workspaceId, UUID userId) {
+        return memberRepository.existsByWorkspaceIdAndUserId(workspaceId, userId);
+    }
+
+    private WorkspaceMember requireMember(UUID workspaceId, UUID userId, String notFoundMessage) {
+        return memberRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException(notFoundMessage));
     }
 }

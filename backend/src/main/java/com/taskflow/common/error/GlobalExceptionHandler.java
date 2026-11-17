@@ -44,6 +44,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.CONFLICT, "The request conflicts with the current state of the resource");
     }
 
+    // TODO(Omar): optimistic locking, step 3. Add a handler for
+    //  org.springframework.orm.ObjectOptimisticLockingFailureException that answers 409 with a
+    //  message the UI can show ("the card was modified by someone else"). Without it, the
+    //  exception falls through to handleUnexpected below and the client gets a 500.
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex) {
         // Log the full stack trace, but never leak internal details to the client.

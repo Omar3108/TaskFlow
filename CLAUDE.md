@@ -30,17 +30,18 @@ enough to defend it in technical interviews.
 - Every feature ships with its tests in the same phase.
 - No secrets in code. Configuration via environment variables; keep `.env.example` current.
 
-### Parts Omar writes himself
+### Parts originally reserved for Omar
 
-For these, provide only the structure with `// TODO` and an explanation of what each piece
-must do. Then review his code like a pull request (bugs, security, best practices):
+Three parts were meant to be written by Omar with Claude only reviewing. All three were
+delegated, so the code is not his and he needs the reasoning explained to defend it:
 
-- The logic that moves cards between columns and recalculates positions.
-- Optimistic locking (`@Version`) for concurrent card edits, and its integration test.
+- Spring Security and the JWT filter: written by Claude at his request (phase 1, 2026-11-15).
+- The card move logic with position recalculation, and optimistic locking (`@Version`) with
+  its integration test: written by a Sonnet subagent at his request (phase 3b, 2026-11-17),
+  reviewed by Claude.
 
-Spring Security and the JWT filter were originally on this list. In phase 1 (2026-11-15) Omar
-asked Claude to write them and explain the reasoning afterwards, so that code is Claude's. The
-two items above are still Omar's unless he says otherwise.
+Nothing is currently reserved. If Omar reserves a part again, provide only the structure with
+`// TODO` and an explanation, then review his code like a pull request.
 
 ## Stack
 
@@ -80,7 +81,16 @@ Environment notes:
   stored hashed. Real e-mail arrives with the extras.
 - **Ordering:** `position` is `DOUBLE PRECISION` (fractional indexing: a moved card gets the
   midpoint between its neighbours, so a move updates one row).
-- **Optimistic locking:** `version` only on `Card`; sent in the request body; stale → HTTP 409.
+- **Optimistic locking:** `version` only on `Card`; sent in the request body; stale → HTTP 409
+  (checked by hand in `CardService.update`, and by Hibernate at flush for the remaining race).
+  A move does **not** bump the version: `column`, `position` and `updatedAt` are
+  `@OptimisticLock(excluded = true)` and `Card` is `@DynamicUpdate`, so an edit never writes a
+  stale position back. Concurrent moves of one card are last-write-wins.
+- **Moves:** `PositionCalculator.between` uses the midpoint, `next - STEP` at the start and
+  `previous + STEP` at the end. When the gap between the neighbours is exhausted (below `1e-6`,
+  or the midpoint collides), the whole list is rebalanced to multiples of 1024 with one native
+  `UPDATE ... row_number()` statement, which bypasses `@Version`. A drop that changes nothing
+  writes nothing. Invalid targets or neighbours answer 400 with a generic message.
 - **Authorization:** resource → workspace → caller's role, resolved by one
   `WorkspaceAccessService` called explicitly from services. Non-members get **404**, not 403.
 - **Roles:** exactly one OWNER per workspace (no ownership transfer in the MVP). MEMBER works
@@ -142,9 +152,7 @@ Backend tests whose class name ends in `Test` are run by Surefire. Integration t
 `AbstractIntegrationTest` (shared PostgreSQL Testcontainer) and are named `*IntegrationTest`.
 Tests that need signed-in users extend `ApiIntegrationTest` (`registerUser`, `perform(user, …)`).
 Board, column and card tests extend `BoardTestSupport` (`createTeam`, `createBoard`,
-`createColumn`, `createCard`, `moveCard`, `cardTitles`). The specification tests for Omar's parts
-are `@Disabled` until phase 3b: `CardMoveIntegrationTest`, `ColumnIntegrationTest.Move` and
-`PositionCalculatorTest.Between`.
+`createColumn`, `createCard`, `moveCard`, `cardTitles`).
 Frontend component tests mock the feature's `api.ts` module with `vi.mock` and render through
 `src/test/renderWithProviders.tsx`.
 
@@ -155,7 +163,7 @@ Frontend component tests mock the feature's `api.ts` module with `vi.mock` and r
 | 0 | Setup: monorepo, Spring Boot, Vite, compose, Flyway, CI | Done |
 | 1 | Authentication (security code written by Claude at Omar's request) | Done |
 | 2 | Workspaces and members | Done |
-| 3 | Boards, columns and cards (move logic + optimistic locking by Omar) | In progress — 3a backend CRUD done; 3b Omar's parts; 3c frontend |
+| 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | In progress — backend done (3a, 3b); frontend (3c) pending |
 | 4 | Labels, comments, search and filters | Not started |
 | 5 | Frontend polish | Not started |
 | 6 | Testing (70%+ backend coverage, component tests, Playwright) | Not started |

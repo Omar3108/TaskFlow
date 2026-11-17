@@ -38,6 +38,26 @@ public interface CardRepository extends JpaRepository<Card, UUID> {
     Double findMaxPositionByColumnId(@Param("columnId") UUID columnId);
 
     /**
+     * Rewrites the positions of a column as STEP, 2 * STEP, ... keeping the current order
+     * (position, then id, the same order every read uses). One statement, so it is atomic and
+     * does not load the cards.
+     *
+     * <p>Native on purpose: JPQL has no window functions. It deliberately bypasses the version
+     * column: a rebalance changes no content, so cards that somebody has open for editing must
+     * stay editable, and it must not fail because a card of the column was edited meanwhile.
+     * The persistence context is flushed before and cleared after, because the entities already
+     * loaded would otherwise hold stale positions.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            update cards set position = ranked.rn * :step
+            from (select id, row_number() over (order by position, id) as rn
+                  from cards where column_id = :columnId) ranked
+            where cards.id = ranked.id
+            """, nativeQuery = true)
+    int rebalanceColumn(@Param("columnId") UUID columnId, @Param("step") double step);
+
+    /**
      * Bulk update: one SQL statement, no entities loaded. Note that bulk statements bypass the
      * persistence context, {@code @PreUpdate} and {@code @Version}.
      */

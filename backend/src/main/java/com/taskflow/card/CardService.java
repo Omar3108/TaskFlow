@@ -2,11 +2,13 @@ package com.taskflow.card;
 
 import com.taskflow.board.BoardAccessService;
 import com.taskflow.board.BoardColumn;
+import com.taskflow.board.BoardColumnRepository;
 import com.taskflow.card.dto.CardResponse;
 import com.taskflow.card.dto.CreateCardRequest;
 import com.taskflow.card.dto.MoveCardRequest;
 import com.taskflow.card.dto.UpdateCardRequest;
 import com.taskflow.common.error.BadRequestException;
+import com.taskflow.common.error.ConflictException;
 import com.taskflow.common.error.ResourceNotFoundException;
 import com.taskflow.common.ordering.PositionCalculator;
 import com.taskflow.user.User;
@@ -22,7 +24,12 @@ public class CardService {
 
     private static final String CARD_NOT_FOUND = "Card not found";
 
+    private static final String INVALID_TARGET = "The target column must belong to the same board as the card";
+    private static final String INVALID_NEIGHBOURS =
+            "The neighbouring cards must be cards of the target column, in order, and not the moved card";
+
     private final CardRepository cardRepository;
+    private final BoardColumnRepository boardColumnRepository;
     private final UserRepository userRepository;
     private final BoardAccessService boardAccess;
     private final WorkspaceAccessService workspaceAccess;
@@ -30,11 +37,13 @@ public class CardService {
 
     public CardService(
             CardRepository cardRepository,
+            BoardColumnRepository boardColumnRepository,
             UserRepository userRepository,
             BoardAccessService boardAccess,
             WorkspaceAccessService workspaceAccess,
             CardMapper mapper) {
         this.cardRepository = cardRepository;
+        this.boardColumnRepository = boardColumnRepository;
         this.userRepository = userRepository;
         this.boardAccess = boardAccess;
         this.workspaceAccess = workspaceAccess;
@@ -66,19 +75,14 @@ public class CardService {
     public CardResponse update(UUID cardId, UUID userId, UpdateCardRequest request) {
         Card card = requireCard(cardId, userId);
 
-        // TODO(Omar): optimistic locking, step 2 (step 1 is @Version in Card).
-        //  Compare request.version() with card.getVersion() here and reject a stale value with
-        //  HTTP 409 before changing anything.
-        //  Why by hand: Hibernate compares the version it loaded with the row in the database.
-        //  This transaction loaded the card a few lines above, so that check only catches a
-        //  change that happens during these few milliseconds. The conflict we care about
-        //  happened earlier, while the user had the card open in the browser, and only the
-        //  version the client sends back can reveal it. (Calling a setter with the client
-        //  version would not work either: Hibernate ignores changes to a @Version field of a
-        //  managed entity.)
-        //  Step 3: the remaining race (two requests that both pass this check) ends in an
-        //  ObjectOptimisticLockingFailureException at flush time; map it to 409 in
-        //  GlobalExceptionHandler.
+        // Check the version the client read, by hand. Hibernate only compares the version it
+        // loaded a few lines above with the row, so it would miss a change made while the user
+        // had the card open in the browser; only the version the client sends back reveals it.
+        // The remaining race (two requests passing this check together) is caught by @Version at
+        // flush time and ends in the same 409 (see GlobalExceptionHandler).
+        if (request.version() != card.getVersion()) {
+            throw new ConflictException("The card was modified by someone else. Reload it and try again.");
+        }
 
         card.setTitle(request.title().trim());
         card.setDescription(normalize(request.description()));
@@ -104,25 +108,70 @@ public class CardService {
     public CardResponse move(UUID cardId, UUID userId, MoveCardRequest request) {
         Card card = requireCard(cardId, userId);
 
-        // TODO(Omar): the move logic. Suggested steps:
-        //  1. Resolve the target column. It must belong to the same board as the card
-        //     (card.getColumn().getBoard().getId()); otherwise 400. A card never changes board.
-        //  2. Resolve the neighbours (each may be null). Each one must be a card of the target
-        //     column and must not be the moved card itself; otherwise 400. Never trust the ids
-        //     just because they exist: a neighbour from another workspace would leak its
-        //     position and corrupt the order.
-        //  3. If both neighbours are present, check they are in the right order and adjacent
-        //     enough for the result to make sense (at least previous.position < next.position).
-        //  4. If PositionCalculator.isExhausted(previous, next), rebalance the target column:
-        //     load its cards in order (cardRepository.findAllByColumnIdOrderByPositionAscIdAsc)
-        //     and rewrite positions as STEP, 2 * STEP, ... Then read the neighbour positions
-        //     again, because they have just changed.
-        //  5. card.setColumn(target); card.setPosition(PositionCalculator.between(...)).
-        //  6. Decide and document how a move interacts with @Version. A normal entity update
-        //     increments the version, which makes the copy another user has open stale even
-        //     though only the position changed. Is that the behaviour you want?
-        //  7. Return mapper.toResponse(...) after a flush, like update() does.
-        throw new UnsupportedOperationException("Moving cards is not implemented yet");
+        UUID boardId = card.getColumn().getBoard().getId();
+        BoardColumn target = boardColumnRepository.findById(request.columnId())
+                .filter(column -> column.getBoard().getId().equals(boardId))
+                .orElseThrow(() -> new BadRequestException(INVALID_TARGET));
+        UUID targetId = target.getId();
+
+        // Never trust ids just because they exist: a neighbour must be a card of the target
+        // column. A column of the same board is always in the caller's workspace, so a foreign
+        // id gets the same generic answer as a nonexistent one.
+        Card previous = resolveNeighbour(request.previousCardId(), cardId, targetId);
+        Card next = resolveNeighbour(request.nextCardId(), cardId, targetId);
+
+        // Dropped where it already is (same column, already strictly between the neighbours):
+        // nothing to write. A write would only touch updated_at and add noise.
+        if (card.getColumn().getId().equals(targetId)
+                && (previous == null || previous.getPosition() < card.getPosition())
+                && (next == null || card.getPosition() < next.getPosition())) {
+            return mapper.toResponse(card);
+        }
+
+        if (previous != null && next != null) {
+            if (previous.getPosition() > next.getPosition()) {
+                throw new BadRequestException(INVALID_NEIGHBOURS);
+            }
+            if (PositionCalculator.isExhausted(previous.getPosition(), next.getPosition())) {
+                // Equal positions (two concurrent moves into the same gap) land here too.
+                // The rebalance renumbers the column and clears the persistence context, so
+                // everything is read again afterwards.
+                cardRepository.rebalanceColumn(targetId, PositionCalculator.STEP);
+                card = cardRepository.findByIdWithBoard(cardId).orElseThrow();
+                previous = cardRepository.findById(previous.getId()).orElseThrow();
+                next = cardRepository.findById(next.getId()).orElseThrow();
+                target = boardColumnRepository.getReferenceById(targetId);
+                // Equal positions are ordered by id, so only now can the real order be checked.
+                if (previous.getPosition() >= next.getPosition()) {
+                    throw new BadRequestException(INVALID_NEIGHBOURS);
+                }
+            }
+        }
+
+        double position = PositionCalculator.between(
+                previous == null ? null : previous.getPosition(), next == null ? null : next.getPosition());
+        card.setColumn(target);
+        card.setPosition(position);
+
+        // Versioning: column, position and updated_at are excluded from the version (see Card),
+        // so a move leaves it unchanged. Bumping it would make the user who has the card open
+        // get a 409 on save although the content did not change. It is safe because edits use
+        // @DynamicUpdate and never write the position back. Two concurrent moves of the same
+        // card are last-write-wins, which is what a drag and drop should do. If two users drop
+        // different cards into the same gap both succeed with equal positions; reads order by
+        // (position, id), so the result is deterministic and the next move into that gap
+        // rebalances the column.
+        return mapper.toResponse(cardRepository.saveAndFlush(card));
+    }
+
+    private Card resolveNeighbour(UUID neighbourId, UUID movedCardId, UUID targetColumnId) {
+        if (neighbourId == null) {
+            return null;
+        }
+        return cardRepository.findById(neighbourId)
+                .filter(neighbour -> !neighbour.getId().equals(movedCardId))
+                .filter(neighbour -> neighbour.getColumn().getId().equals(targetColumnId))
+                .orElseThrow(() -> new BadRequestException(INVALID_NEIGHBOURS));
     }
 
     /**

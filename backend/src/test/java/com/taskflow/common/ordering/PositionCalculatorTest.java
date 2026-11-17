@@ -3,7 +3,6 @@ package com.taskflow.common.ordering;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -20,9 +19,8 @@ class PositionCalculatorTest {
         assertThat(PositionCalculator.append(0.5)).isGreaterThan(0.5);
     }
 
-    /** Specification for the part written in phase 3b: remove @Disabled when it is ready. */
+    /** Specification of between() and isExhausted(). */
     @Nested
-    @Disabled("Pending PositionCalculator.between / isExhausted (phase 3b)")
     class Between {
 
         @Test

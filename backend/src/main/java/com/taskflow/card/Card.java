@@ -13,12 +13,18 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.hibernate.annotations.DynamicUpdate;
+import org.hibernate.annotations.OptimisticLock;
 
 @Entity
 @Table(name = "cards")
+// Only write the columns that changed. Otherwise an edit loaded before a move would write its
+// stale position back, undoing the move (the version does not move, so nothing would catch it).
+@DynamicUpdate
 public class Card {
 
     @Id
@@ -26,6 +32,9 @@ public class Card {
     private UUID id;
 
     // Not "updatable = false": moving a card to another column changes this.
+    // Excluded from the version: a move is not a content edit, so it must not make the copy of
+    // the card that somebody else has open stale (see CardService.move).
+    @OptimisticLock(excluded = true)
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "column_id", nullable = false)
     private BoardColumn column;
@@ -36,6 +45,7 @@ public class Card {
     @Column(columnDefinition = "text")
     private String description;
 
+    @OptimisticLock(excluded = true) // same reason as column: moving is not an edit
     @Column(nullable = false)
     private double position;
 
@@ -50,17 +60,17 @@ public class Card {
     @JoinColumn(name = "created_by", updatable = false)
     private User createdBy;
 
-    // TODO(Omar): optimistic locking. Today this is a plain column that stays at 0.
-    //  Annotating it with jakarta.persistence.Version makes Hibernate (1) add
-    //  "AND version = ?" to every UPDATE/DELETE of this entity, (2) increment the value on
-    //  each update and (3) throw an optimistic-lock exception when no row matched.
-    //  Keep it without a setter: only Hibernate should ever write this field.
+    // Optimistic locking: Hibernate adds "AND version = ?" to every UPDATE/DELETE, increments the
+    // value on each update and throws when no row matched. No setter: only Hibernate writes it.
+    @Version
     @Column(nullable = false)
     private long version;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    // Derived from the other fields, so touching it alone must not bump the version either.
+    @OptimisticLock(excluded = true)
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 

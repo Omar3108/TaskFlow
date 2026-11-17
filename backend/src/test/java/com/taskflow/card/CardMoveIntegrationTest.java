@@ -12,15 +12,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
- * Specification of {@code PATCH /cards/{id}/move}. Written ahead of the implementation: remove
- * {@code @Disabled} when CardService.move is ready. Tests only look at the resulting order,
+ * Specification of {@code PATCH /cards/{id}/move}. Tests only look at the resulting order,
  * never at exact position values, so any correct position strategy passes.
  */
-@Disabled("Pending CardService.move (phase 3b)")
 class CardMoveIntegrationTest extends BoardTestSupport {
 
     private Team team;

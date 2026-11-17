@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,10 +45,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 HttpStatus.CONFLICT, "The request conflicts with the current state of the resource");
     }
 
-    // TODO(Omar): optimistic locking, step 3. Add a handler for
-    //  org.springframework.orm.ObjectOptimisticLockingFailureException that answers 409 with a
-    //  message the UI can show ("the card was modified by someone else"). Without it, the
-    //  exception falls through to handleUnexpected below and the client gets a 500.
+    /**
+     * Two requests passed the version check of the service but wrote the same row; Hibernate
+     * rejected the second one at flush time. Same answer as the explicit stale-version check so
+     * the UI has one case to handle: reload the card and let the user retry.
+     */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLockingFailure(ObjectOptimisticLockingFailureException ex) {
+        log.debug("Optimistic locking failure: {}", ex.getMessage());
+        return ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, "The card was modified by someone else. Reload it and try again.");
+    }
 
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception ex) {

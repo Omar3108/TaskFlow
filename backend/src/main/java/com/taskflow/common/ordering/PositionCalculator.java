@@ -12,6 +12,13 @@ public final class PositionCalculator {
     /** Distance left between consecutive items when appending or rebalancing. */
     public static final double STEP = 1024.0;
 
+    /**
+     * Smallest gap worth splitting. Positions are normally a few thousand to a few million, where
+     * a double still resolves differences of about 1e-10, so 1e-6 leaves a comfortable margin
+     * (about 30 consecutive halvings of a STEP gap) before a rebalance.
+     */
+    public static final double MIN_GAP = 1e-6;
+
     private PositionCalculator() {
     }
 
@@ -33,16 +40,21 @@ public final class PositionCalculator {
      *                 item goes to the end of the list
      */
     public static double between(Double previous, Double next) {
-        // TODO(Omar): four cases.
-        //  - both null     -> the list is empty: same answer as append(null).
-        //  - previous null -> going to the start: a value below `next`. Both next / 2 (keeps
-        //                     positions positive) and next - STEP are valid; pick one and be
-        //                     able to explain why.
-        //  - next null     -> going to the end: same answer as append(previous).
-        //  - both present  -> the midpoint. Reject previous >= next with an
-        //                     IllegalArgumentException: it means the caller passed neighbours
-        //                     that are not adjacent in that order.
-        throw new UnsupportedOperationException("PositionCalculator.between is not implemented yet");
+        if (previous == null) {
+            // "next - STEP" rather than "next / 2": halving only works while positions are
+            // positive and keeps shrinking the room before the first item, whereas a fixed
+            // step leaves the same room every time (positions may become negative, which a
+            // DOUBLE PRECISION column accepts) and can never run out of precision.
+            return next == null ? append(null) : next - STEP;
+        }
+        if (next == null) {
+            return append(previous);
+        }
+        if (previous >= next) {
+            throw new IllegalArgumentException(
+                    "Neighbours must be in ascending order: previous=" + previous + ", next=" + next);
+        }
+        return previous + (next - previous) / 2;
     }
 
     /**
@@ -54,10 +66,12 @@ public final class PositionCalculator {
      * 2*STEP, 3*STEP...) before computing the new position.
      */
     public static boolean isExhausted(double previous, double next) {
-        // TODO(Omar): decide the rule. Two options to weigh:
-        //  - exact: the midpoint equals `previous` or `next` (rebalances as late as possible).
-        //  - threshold: next - previous < some MIN_GAP constant (rebalances earlier, simpler to
-        //    reason about and to test).
-        throw new UnsupportedOperationException("PositionCalculator.isExhausted is not implemented yet");
+        // Both conditions on purpose. The exact test (midpoint collides with an end) is the
+        // hard limit: past it the order would silently break. The MIN_GAP threshold rebalances
+        // long before that, while the position still has plenty of precision, so a rebalance
+        // never happens in the middle of a pathological state. It also catches the zero gap
+        // left by two concurrent moves into the same gap (equal positions).
+        double midpoint = previous + (next - previous) / 2;
+        return next - previous < MIN_GAP || midpoint <= previous || midpoint >= next;
     }
 }

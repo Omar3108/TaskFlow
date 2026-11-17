@@ -129,6 +129,18 @@ Environment notes:
   fixed number of queries, plus the caller's role. Table `board_columns`, entity `BoardColumn`.
   New items are appended at `max(position) + 1024`; `PositionCalculator` (`common.ordering`)
   owns the position maths for both columns and cards.
+- **New boards** start with "To do", "In progress" and "Done" unless `defaultColumns: false`
+  (`CreateBoardRequest`; backend tests create empty boards through `BoardTestSupport`).
+- **Board UI (drag and drop):** dnd-kit (`core`, `sortable`, `utilities`). The placement logic
+  lives in pure functions (`features/boards/dnd.ts`): arrange by index, describe by neighbours
+  (`cardMoveFor`), apply neighbours (`applyCardMove`, also used for the optimistic update).
+  While dragging, `KanbanBoard` keeps a draft tied to the cached board object it came from, so
+  it is ignored as soon as the cache changes (no flash between drop and optimistic update).
+  Moves are optimistic (`optimisticBoardUpdate`: cancel, snapshot, write, rollback, refetch).
+  Space picks up a card with the keyboard, Enter opens it. `BoardPage` is lazy-loaded so
+  dnd-kit stays out of the main bundle.
+- **Card dialog:** loads the full card (`refetchOnWindowFocus: false`, so typing is never
+  reset); a 409 shows a notice with "Load latest version", and the form is keyed by `version`.
 - **Card fields:** title, description, single assignee, due date (no priority; labels arrive in
   phase 4). Updates (`PATCH`) send every editable field: a missing or null field is cleared.
   The assignee must be a workspace member (400 otherwise); when a member is removed or leaves,
@@ -157,6 +169,7 @@ Board, column and card tests extend `BoardTestSupport` (`createTeam`, `createBoa
 `createColumn`, `createCard`, `moveCard`, `cardTitles`).
 Frontend component tests mock the feature's `api.ts` module with `vi.mock` and render through
 `src/test/renderWithProviders.tsx`.
+Shared API-shape builders (`sampleBoard`, `fullCard`, `member`) live in `src/test/fixtures.ts`.
 
 ## Phase status
 
@@ -165,7 +178,7 @@ Frontend component tests mock the feature's `api.ts` module with `vi.mock` and r
 | 0 | Setup: monorepo, Spring Boot, Vite, compose, Flyway, CI | Done |
 | 1 | Authentication (security code written by Claude at Omar's request) | Done |
 | 2 | Workspaces and members | Done |
-| 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | In progress — backend done (3a, 3b); frontend (3c) pending |
+| 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | Done — pending merge |
 | 4 | Labels, comments, search and filters | Not started |
 | 5 | Frontend polish | Not started |
 | 6 | Testing (70%+ backend coverage, component tests, Playwright) | Not started |

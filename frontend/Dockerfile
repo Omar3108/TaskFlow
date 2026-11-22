@@ -21,3 +21,8 @@ COPY --from=build /app/dist /usr/share/nginx/html
 
 ENV API_UPSTREAM=http://api:8080
 EXPOSE 80
+
+# Lets `docker compose up --wait` (used in CI) know when the site is being served.
+# 127.0.0.1, not localhost: in Alpine "localhost" resolves to IPv6 first and nginx listens on IPv4.
+HEALTHCHECK --interval=5s --timeout=3s --retries=10 \
+    CMD wget -qO- http://127.0.0.1/ > /dev/null || exit 1

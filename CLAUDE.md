@@ -145,6 +145,19 @@ Environment notes:
   phase 4). Updates (`PATCH`) send every editable field: a missing or null field is cleared.
   The assignee must be a workspace member (400 otherwise); when a member is removed or leaves,
   `MemberRemovedEvent` unassigns their cards in the same transaction.
+- **Labels:** belong to a board; ADMIN+ manages them, every member sees them and labels cards.
+  Colours come from a fixed palette (`LabelColor`, 8 values, `CHECK` constraint). Names are
+  unique per board ignoring case (expression index on `lower(name)`); lists sort by
+  `lower(name)`. A card's labels travel in `PATCH /cards/{id}` as `labelIds` (missing = none),
+  so they are version-checked and bump the version; ids from another board → 400.
+- **Comments:** `GET /cards/{id}/comments` is paginated (`PageResponse`, newest first, only
+  `createdAt` sortable, `max-page-size: 100`). Every member posts; only the author edits; the
+  author or an ADMIN+ deletes (moderation). `author_id` is `ON DELETE SET NULL`.
+- **Board filters:** `GET /boards/{id}` takes optional `q` (case-insensitive `LOWER(...) LIKE`
+  on title and description, wildcards escaped), `assigneeId`, `unassigned=true`, `labelId`,
+  `due=OVERDUE|WEEK|NONE` (UTC), combined with AND via JPA Specifications
+  (`CardSpecifications`). All columns are returned, only matching cards. Card summaries carry
+  `labels` and `commentCount`, read with one bulk query each.
 - **Resource 404s:** a non-member gets the same 404 body as for a missing id ("Board not
   found", "Column not found", "Card not found"), via `WorkspaceAccessService.requireRole(...,
   notFoundMessage)`.
@@ -166,7 +179,7 @@ Backend tests whose class name ends in `Test` are run by Surefire. Integration t
 `AbstractIntegrationTest` (shared PostgreSQL Testcontainer) and are named `*IntegrationTest`.
 Tests that need signed-in users extend `ApiIntegrationTest` (`registerUser`, `perform(user, …)`).
 Board, column and card tests extend `BoardTestSupport` (`createTeam`, `createBoard`,
-`createColumn`, `createCard`, `moveCard`, `cardTitles`).
+`createColumn`, `createCard`, `createLabel`, `comment`, `editCard`, `moveCard`, `cardTitles`).
 Frontend component tests mock the feature's `api.ts` module with `vi.mock` and render through
 `src/test/renderWithProviders.tsx`.
 Shared API-shape builders (`sampleBoard`, `fullCard`, `member`) live in `src/test/fixtures.ts`.
@@ -178,8 +191,8 @@ Shared API-shape builders (`sampleBoard`, `fullCard`, `member`) live in `src/tes
 | 0 | Setup: monorepo, Spring Boot, Vite, compose, Flyway, CI | Done |
 | 1 | Authentication (security code written by Claude at Omar's request) | Done |
 | 2 | Workspaces and members | Done |
-| 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | Done — pending merge |
-| 4 | Labels, comments, search and filters | Not started |
+| 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | Done |
+| 4 | Labels, comments, search and filters | In progress — 4a backend done; 4b frontend pending |
 | 5 | Frontend polish | Not started |
 | 6 | Testing (70%+ backend coverage, component tests, Playwright) | Not started |
 | 7 | Docker, CI/CD and deployment, demo user | Not started |

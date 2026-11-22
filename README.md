@@ -46,6 +46,13 @@ forwards `/api` to the API container, which is not published on the host.
 ## Tests
 
 ```bash
-cd backend && ./mvnw verify   # needs Docker running (Testcontainers)
-cd frontend && npm run test
+cd backend && ./mvnw verify            # unit + integration tests (needs Docker); fails below 80% lines / 70% branches
+cd frontend && npm run test:coverage   # component tests with coverage minimums
+
+# End-to-end: three user flows in a real browser against the app in Docker
+docker compose --profile app up -d --build --wait
+cd e2e && npm ci && npx playwright install chromium && npm test
 ```
+
+Coverage reports: `backend/target/site/jacoco/index.html` and `frontend/coverage/index.html`.
+See [`e2e/README.md`](e2e/README.md) for the end-to-end flows.

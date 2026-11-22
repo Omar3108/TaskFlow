@@ -186,6 +186,18 @@ Environment notes:
   hashed assets for a year and never caches `index.html`. Compose profile `app` adds `api` (not
   published) and `web` (`WEB_PORT`, default 3000); plain `docker compose up` stays DB-only. The
   `api` service sets `CORS_ALLOWED_ORIGINS` to the web origin and `COOKIE_SECURE=false`.
+- **Quality gates (phase 6b):** JaCoCo `check` fails `verify` below 80% lines / 70% branches
+  (MapStruct `*MapperImpl` and `TaskflowApplication` excluded). Vitest V8 coverage minimums:
+  75% lines/statements/functions, 65% branches. Both sit a little below the current values.
+  CI runs a third job, `e2e`, after backend and frontend: `docker compose --profile app up
+  --wait`, Playwright with Chromium, report and container logs uploaded on failure. The web image
+  has a healthcheck (`127.0.0.1`, not `localhost`, because Alpine resolves localhost to IPv6).
+- **Lessons from the E2E tests:** they found three bugs that component tests could not see
+  (all fixed, each with a regression test): React Hook Form returns a string, not a list, for a
+  single checkbox (use a `Controller` for checkbox groups); per-call `mutate(..., { onSuccess })`
+  callbacks are dropped when the component remounts, so use `mutateAsync` when a mutation can
+  remount its own form; and an inline "add" form must clear itself on submit, not when the
+  request finishes, and keep its submit button enabled so Enter works.
 - **Resource 404s:** a non-member gets the same 404 body as for a missing id ("Board not
   found", "Column not found", "Card not found"), via `WorkspaceAccessService.requireRole(...,
   notFoundMessage)`.
@@ -202,6 +214,8 @@ cd backend && ./mvnw spring-boot:run # API on http://localhost:8080 (or PORT fro
 cd backend && ./mvnw verify          # build + tests (needs Docker running) + JaCoCo report
 cd frontend && npm run dev           # UI on http://localhost:5173
 cd frontend && npm run lint && npm run format:check && npm run test && npm run build
+cd frontend && npm run test:coverage # with coverage minimums
+cd e2e && npm test                   # Playwright, needs the app running on :3000 (E2E_BROWSER_CHANNEL=msedge locally)
 ```
 
 Backend tests whose class name ends in `Test` are run by Surefire. Integration tests extend
@@ -211,6 +225,10 @@ Board, column and card tests extend `BoardTestSupport` (`createTeam`, `createBoa
 `createColumn`, `createCard`, `createLabel`, `comment`, `editCard`, `moveCard`, `cardTitles`).
 Frontend component tests mock the feature's `api.ts` module with `vi.mock` and render through
 `src/test/renderWithProviders.tsx`.
+`src/test/apiContract.test.ts` checks the URL, method and body of every API function: add a row
+when adding an endpoint. End-to-end tests live in `e2e/` (own package, Playwright); they set up
+data through the API (`Api` in `tests/support.ts`), drive the behaviour through the browser, and
+register unique users per test so they can run in parallel on a database that has data.
 Shared API-shape builders (`sampleBoard`, `fullCard`, `member`, `comment`, `page`, `BUG`, `DOCS`)
 live in `src/test/fixtures.ts`.
 
@@ -224,7 +242,7 @@ live in `src/test/fixtures.ts`.
 | 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | Done |
 | 4 | Labels, comments, search and filters | Done — pending merge |
 | 5 | Frontend polish | Done — pending merge |
-| 6 | Testing (70%+ backend coverage, component tests, Playwright) | In progress — 6a Docker stack done; 6b coverage gates + E2E pending |
+| 6 | Testing (70%+ backend coverage, component tests, Playwright) | Done — pending merge |
 | 7 | Docker, CI/CD and deployment, demo user | Not started |
 | 8 | Extras: WebSockets, notifications, activity history, dashboard, attachments, dark mode | Not started |
 | 9 | README in English | Not started |

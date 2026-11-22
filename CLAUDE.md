@@ -178,6 +178,14 @@ Environment notes:
   phones; columns snap on small screens. Due dates are red when overdue and amber within two
   days (`features/cards/dueDate.ts`, with screen-reader text). Column actions live in a "⋯"
   menu. On phones the filters fold behind a "Filters (n)" button.
+- **Docker (phase 6a):** multi-stage images. `backend/Dockerfile`: dependencies cached in their
+  own layer, jar split with Spring Boot layertools, JRE-only runtime as a non-root user,
+  healthcheck on `/actuator/health`; tests are not run in the image (CI runs them).
+  `frontend/Dockerfile`: Vite build served by nginx; `nginx.conf.template` proxies `/api` to
+  `${API_UPSTREAM}` (envsubst at start), falls back to `index.html` for client routes, caches
+  hashed assets for a year and never caches `index.html`. Compose profile `app` adds `api` (not
+  published) and `web` (`WEB_PORT`, default 3000); plain `docker compose up` stays DB-only. The
+  `api` service sets `CORS_ALLOWED_ORIGINS` to the web origin and `COOKIE_SECURE=false`.
 - **Resource 404s:** a non-member gets the same 404 body as for a missing id ("Board not
   found", "Column not found", "Card not found"), via `WorkspaceAccessService.requireRole(...,
   notFoundMessage)`.
@@ -189,6 +197,7 @@ Environment notes:
 
 ```bash
 docker compose up -d                 # PostgreSQL on localhost:5432
+docker compose --profile app up -d --build  # whole app (db + api + web) on http://localhost:3000
 cd backend && ./mvnw spring-boot:run # API on http://localhost:8080 (or PORT from .env); docs at /swagger-ui
 cd backend && ./mvnw verify          # build + tests (needs Docker running) + JaCoCo report
 cd frontend && npm run dev           # UI on http://localhost:5173
@@ -215,7 +224,7 @@ live in `src/test/fixtures.ts`.
 | 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | Done |
 | 4 | Labels, comments, search and filters | Done — pending merge |
 | 5 | Frontend polish | Done — pending merge |
-| 6 | Testing (70%+ backend coverage, component tests, Playwright) | Not started |
+| 6 | Testing (70%+ backend coverage, component tests, Playwright) | In progress — 6a Docker stack done; 6b coverage gates + E2E pending |
 | 7 | Docker, CI/CD and deployment, demo user | Not started |
 | 8 | Extras: WebSockets, notifications, activity history, dashboard, attachments, dark mode | Not started |
 | 9 | README in English | Not started |

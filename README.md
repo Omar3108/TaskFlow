@@ -30,6 +30,19 @@ npm install
 npm run dev                   # UI on http://localhost:5173
 ```
 
+### Whole app in Docker
+
+To try the app without installing Java or Node, run everything in containers:
+
+```bash
+cp .env.example .env                          # if you have not already
+docker compose --profile app up -d --build    # PostgreSQL + API + web
+```
+
+Open http://localhost:3000 (change it with `WEB_PORT` in `.env`). nginx serves the frontend and
+forwards `/api` to the API container, which is not published on the host.
+`docker compose --profile app down` stops it; the database volume is kept.
+
 ## Tests
 
 ```bash

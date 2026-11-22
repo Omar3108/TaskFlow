@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
@@ -110,7 +111,12 @@ export function MemberList({ workspaceId, currentUserId, currentRole }: Props) {
         onCancel={closeRemoveDialog}
         onConfirm={() => {
           if (memberToRemove) {
-            removeMember.mutate(memberToRemove.userId, { onSuccess: closeRemoveDialog })
+            removeMember.mutate(memberToRemove.userId, {
+              onSuccess: () => {
+                toast.success(`${memberToRemove.displayName} was removed`)
+                closeRemoveDialog()
+              },
+            })
           }
         }}
       >

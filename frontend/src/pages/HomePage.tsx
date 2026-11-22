@@ -4,9 +4,11 @@ import { Button } from '../components/ui/Button'
 import { CreateWorkspaceDialog } from '../features/workspaces/components/CreateWorkspaceDialog'
 import { ReceivedInvitations } from '../features/workspaces/components/ReceivedInvitations'
 import { WorkspaceList } from '../features/workspaces/components/WorkspaceList'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 /** Landing page for signed-in users: pending invitations and the list of workspaces. */
 export function HomePage() {
+  useDocumentTitle('Your workspaces')
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
 

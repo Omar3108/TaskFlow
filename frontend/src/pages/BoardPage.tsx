@@ -1,26 +1,23 @@
 import { Link, useParams, useSearchParams } from 'react-router'
 import { Alert } from '../components/ui/Alert'
 import { BoardHeader } from '../features/boards/components/BoardHeader'
+import { BoardSkeleton } from '../features/boards/components/BoardSkeleton'
 import { FilterBar } from '../features/boards/components/FilterBar'
 import { KanbanBoard } from '../features/boards/components/KanbanBoard'
 import { hasFilters, readFilters, writeFilters } from '../features/boards/filters'
 import { useBoard } from '../features/boards/hooks'
 import { ApiError } from '../lib/apiClient'
 import { errorMessage } from '../lib/errors'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 export function BoardPage() {
   const { boardId = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const filters = readFilters(searchParams)
   const board = useBoard(boardId, filters)
+  useDocumentTitle(board.data?.name)
 
-  if (board.isPending) {
-    return (
-      <p role="status" className="text-sm text-slate-500">
-        Loading board…
-      </p>
-    )
-  }
+  if (board.isPending) return <BoardSkeleton />
 
   if (board.isError) {
     // The API answers 404 both for unknown boards and for boards of other workspaces.

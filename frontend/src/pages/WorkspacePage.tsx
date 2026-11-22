@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { toast } from 'sonner'
 import { Alert } from '../components/ui/Alert'
+import { Skeleton, SkeletonStatus } from '../components/ui/Skeleton'
 import { useAuth } from '../features/auth/AuthContext'
 import { BoardList } from '../features/boards/components/BoardList'
 import { InvitationPanel } from '../features/workspaces/components/InvitationPanel'
@@ -11,6 +13,7 @@ import { useWorkspace } from '../features/workspaces/hooks'
 import { canManageInvitations } from '../features/workspaces/permissions'
 import { ApiError } from '../lib/apiClient'
 import { errorMessage } from '../lib/errors'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -26,12 +29,19 @@ export function WorkspacePage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const workspace = useWorkspace(workspaceId)
+  useDocumentTitle(workspace.data?.name)
 
   if (workspace.isPending) {
     return (
-      <p role="status" className="text-sm text-slate-500">
-        Loading workspace…
-      </p>
+      <SkeletonStatus label="Loading workspace…">
+        <Skeleton className="mb-2 h-4 w-28" />
+        <Skeleton className="mb-8 h-7 w-56" />
+        <Skeleton className="mb-3 h-5 w-20" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+      </SkeletonStatus>
     )
   }
 
@@ -85,7 +95,10 @@ export function WorkspacePage() {
           key={data.name}
           workspace={data}
           currentUserId={user.id}
-          onGone={() => navigate('/', { replace: true })}
+          onGone={(message) => {
+            toast.success(message)
+            navigate('/', { replace: true })
+          }}
         />
       </Section>
     </>

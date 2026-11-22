@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
+import { TileGridSkeleton } from '../../../components/ui/Skeleton'
 import { errorMessage } from '../../../lib/errors'
 import type { WorkspaceRole } from '../../../types/api'
 import { useBoards } from '../hooks'
@@ -20,11 +21,7 @@ export function BoardList({ workspaceId, role }: Props) {
 
   let content
   if (boards.isPending) {
-    content = (
-      <p role="status" className="text-sm text-slate-500">
-        Loading boards…
-      </p>
-    )
+    content = <TileGridSkeleton label="Loading boards…" count={2} />
   } else if (boards.isError) {
     content = <Alert>{errorMessage(boards.error)}</Alert>
   } else if (boards.data.length === 0) {

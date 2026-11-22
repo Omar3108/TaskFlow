@@ -18,6 +18,8 @@ import { useLabels } from '../../labels/hooks'
 import { useMembers } from '../../workspaces/hooks'
 import { useCard, useDeleteCard, useUpdateCard } from '../hooks'
 import { cardSchema, type CardValues } from '../schemas'
+import { toast } from 'sonner'
+import { Skeleton, SkeletonStatus } from '../../../components/ui/Skeleton'
 
 interface Props {
   cardId: string
@@ -45,9 +47,16 @@ function CardDialogBody({ cardId, boardId, workspaceId, role, onClose }: Props) 
 
   if (card.isPending) {
     return (
-      <p role="status" className="text-sm text-slate-500">
-        Loading card…
-      </p>
+      <SkeletonStatus label="Loading card…">
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-28 w-full" />
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-9" />
+            <Skeleton className="h-9" />
+          </div>
+        </div>
+      </SkeletonStatus>
     )
   }
   if (card.isError) {
@@ -134,7 +143,12 @@ function CardForm({
         // The version this form was filled from: if somebody saved since, the server says 409.
         version: card.version,
       },
-      { onSuccess: onClose },
+      {
+        onSuccess: () => {
+          toast.success('Card saved')
+          onClose()
+        },
+      },
     ),
   )
 
@@ -212,7 +226,14 @@ function CardForm({
               variant="danger"
               size="sm"
               loading={deleteCard.isPending}
-              onClick={() => deleteCard.mutate(card.id, { onSuccess: onClose })}
+              onClick={() =>
+                deleteCard.mutate(card.id, {
+                  onSuccess: () => {
+                    toast.success('Card deleted')
+                    onClose()
+                  },
+                })
+              }
             >
               Delete card
             </Button>

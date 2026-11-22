@@ -9,6 +9,7 @@ import type { Comment, WorkspaceRole } from '../../../types/api'
 import { isAtLeast } from '../../workspaces/permissions'
 import { useComments, useCreateComment, useDeleteComment, useUpdateComment } from '../hooks'
 import { commentSchema, type CommentValues } from '../schemas'
+import { toast } from 'sonner'
 
 interface Props {
   cardId: string
@@ -144,7 +145,11 @@ function CommentItem({ comment, cardId, boardId, isAuthor, canModerate }: ItemPr
               size="sm"
               variant="danger"
               loading={deleteComment.isPending}
-              onClick={() => deleteComment.mutate(comment.id)}
+              onClick={() =>
+                deleteComment.mutate(comment.id, {
+                  onSuccess: () => toast.success('Comment deleted'),
+                })
+              }
             >
               Delete comment
             </Button>
@@ -220,7 +225,7 @@ function CommentForm({
       {error && <Alert>{error}</Alert>}
       <TextArea label={label} rows={2} error={errors.body?.message} {...register('body')} />
       <div className="flex gap-2">
-        <Button type="submit" size="sm" loading={pending}>
+        <Button type="submit" loading={pending}>
           {submitLabel}
         </Button>
         {onCancel && (

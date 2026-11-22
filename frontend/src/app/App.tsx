@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router'
+import { Toaster } from 'sonner'
 import { AuthProvider } from '../features/auth/AuthProvider'
 import { ApiError } from '../lib/apiClient'
 import { AppRoutes } from './AppRoutes'
@@ -22,6 +23,8 @@ function App() {
         <BrowserRouter>
           <AppRoutes />
         </BrowserRouter>
+        {/* One toaster for the whole app; toasts are announced to screen readers. */}
+        <Toaster position="bottom-right" richColors closeButton />
       </AuthProvider>
     </QueryClientProvider>
   )

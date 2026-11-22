@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
@@ -267,3 +268,32 @@ test('a board with a single label can label the card (one checkbox still sends a
     ),
   )
 })
+
+test('the dialog closes after saving even though saving remounts the form', async () => {
+  // A new version in the cache remounts the form (key={version}) while the board is still being
+  // refetched. Closing must not depend on callbacks of the form that was unmounted.
+  const user = userEvent.setup()
+  vi.mocked(api.updateCard).mockResolvedValue(fullCard({ labels: [BUG], version: 2 }))
+  const onClose = vi.fn()
+  renderWithProviders(
+    <SlowBoardRefetch>
+      <CardDialog cardId="a" boardId="board-1" workspaceId="ws-1" role="MEMBER" onClose={onClose} />
+    </SlowBoardRefetch>,
+    { auth: { status: 'authenticated', user: ADA } },
+  )
+
+  await user.click(await screen.findByRole('button', { name: 'Save' }))
+
+  await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(1), { timeout: 2000 })
+  // Toasts of earlier tests may still be on screen, hence "all".
+  expect((await screen.findAllByText('Card saved')).length).toBeGreaterThan(0)
+})
+
+/** Keeps a board query in the cache whose refetch takes a while, like over a real network. */
+function SlowBoardRefetch({ children }: { children: React.ReactNode }) {
+  useQuery({
+    queryKey: ['boards', 'board-1', 'detail', {}],
+    queryFn: () => new Promise((resolve) => setTimeout(() => resolve({}), 300)),
+  })
+  return <>{children}</>
+}

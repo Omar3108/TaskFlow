@@ -133,9 +133,13 @@ function CardForm({
     },
   })
 
-  const onSubmit = handleSubmit((values) =>
-    updateCard.mutate(
-      {
+  // mutateAsync rather than mutate(..., { onSuccess }): saving stores a new version in the
+  // cache, which remounts this form (key={version}) before the request has fully settled, and
+  // TanStack Query drops the per-call callbacks of an unmounted component. The promise still
+  // resolves, so closing the dialog and the toast do not depend on this component surviving.
+  const onSubmit = handleSubmit(async (values) => {
+    try {
+      await updateCard.mutateAsync({
         title: values.title,
         description: emptyToNull(values.description),
         assigneeId: values.assigneeId || null,
@@ -143,15 +147,24 @@ function CardForm({
         labelIds: values.labelIds,
         // The version this form was filled from: if somebody saved since, the server says 409.
         version: card.version,
-      },
-      {
-        onSuccess: () => {
-          toast.success('Card saved')
-          onClose()
-        },
-      },
-    ),
-  )
+      })
+    } catch {
+      // Shown by the alert below (updateCard.error); nothing else to do here.
+      return
+    }
+    toast.success('Card saved')
+    onClose()
+  })
+
+  const onDelete = async () => {
+    try {
+      await deleteCard.mutateAsync(card.id)
+    } catch {
+      return
+    }
+    toast.success('Card deleted')
+    onClose()
+  }
 
   const conflict = updateCard.error instanceof ApiError && updateCard.error.status === 409
 
@@ -243,14 +256,7 @@ function CardForm({
               variant="danger"
               size="sm"
               loading={deleteCard.isPending}
-              onClick={() =>
-                deleteCard.mutate(card.id, {
-                  onSuccess: () => {
-                    toast.success('Card deleted')
-                    onClose()
-                  },
-                })
-              }
+              onClick={() => void onDelete()}
             >
               Delete card
             </Button>

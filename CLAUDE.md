@@ -52,7 +52,7 @@ pull requests and checks that nothing is broken.
   `ProblemDetail`, springdoc-openapi, Actuator. Tests: JUnit 5, Mockito, MockMvc,
   Testcontainers, JaCoCo (target 70%+).
 - **Frontend:** React 19 + TypeScript + Vite, React Router, TanStack Query, React Hook Form +
-  Zod, Tailwind CSS 4, dnd-kit, ESLint + Prettier. Tests: Vitest + React Testing Library,
+  Zod, Tailwind CSS 4, dnd-kit, sonner (toasts), ESLint + Prettier. Tests: Vitest + React Testing Library,
   Playwright (2–3 E2E flows).
 - **Infra:** multi-stage Dockerfiles, `docker-compose.yml`, GitHub Actions, backend + PostgreSQL
   on Render/Railway, frontend on Vercel.
@@ -165,6 +165,19 @@ Environment notes:
   cached variant. Comments use `useInfiniteQuery` ("Show older comments") and are invalidated
   after any change because offset pages shift. Label colours map to static Tailwind classes in
   `features/labels/colors.ts`.
+- **UI shell and feedback (phase 5):** toasts with `sonner` (one `<Toaster>` in `App`, also in
+  `renderWithProviders`) for confirmations and move errors; skeletons (`components/ui/Skeleton`)
+  instead of "Loading…" text; an `ErrorBoundary` per route (keyed by pathname); a real
+  `NotFoundPage` inside the protected layout; `useDocumentTitle` sets "<page> · TaskFlow";
+  skip link; account menu (`components/ui/Menu`, WAI-ARIA menu button) with `/account`, which
+  updates the display name through `AuthContext.updateUser`. Board pages are full width, other
+  pages `max-w-5xl`.
+- **Board UX (phase 5):** the open card is in the URL (`?card=<id>`; closing goes back when it
+  was opened on the board, otherwise drops the parameter). Sensors: `MouseSensor` (5 px) +
+  `TouchSensor` (250 ms press) + keyboard, cards use `touch-manipulation` so swiping scrolls on
+  phones; columns snap on small screens. Due dates are red when overdue and amber within two
+  days (`features/cards/dueDate.ts`, with screen-reader text). Column actions live in a "⋯"
+  menu. On phones the filters fold behind a "Filters (n)" button.
 - **Resource 404s:** a non-member gets the same 404 body as for a missing id ("Board not
   found", "Column not found", "Card not found"), via `WorkspaceAccessService.requireRole(...,
   notFoundMessage)`.
@@ -201,10 +214,10 @@ live in `src/test/fixtures.ts`.
 | 2 | Workspaces and members | Done |
 | 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | Done |
 | 4 | Labels, comments, search and filters | Done — pending merge |
-| 5 | Frontend polish | Not started |
+| 5 | Frontend polish | Done — pending merge |
 | 6 | Testing (70%+ backend coverage, component tests, Playwright) | Not started |
 | 7 | Docker, CI/CD and deployment, demo user | Not started |
-| 8 | Extras: WebSockets, notifications, activity history, dashboard, attachments | Not started |
+| 8 | Extras: WebSockets, notifications, activity history, dashboard, attachments, dark mode | Not started |
 | 9 | README in English | Not started |
 
 Update this table and the decisions above whenever something changes.

@@ -1,0 +1,5 @@
+# Dependencies are installed inside the image (npm ci); local builds and reports stay out.
+node_modules/
+dist/
+coverage/
+.env

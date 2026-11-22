@@ -1,0 +1,37 @@
+# Serves the built frontend and forwards /api to the backend, so the browser sees one origin:
+# no CORS preflight and a first-party refresh-token cookie, like Vite in development and the
+# hosting rewrite in production. ${API_UPSTREAM} is filled in when the container starts.
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    # Do not advertise the nginx version.
+    server_tokens off;
+
+    location /api/ {
+        proxy_pass ${API_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Vite puts a content hash in every asset name, so a file never changes under the same name
+    # and browsers may cache it for a year.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        try_files $uri =404;
+    }
+
+    # Client-side routing: /boards/123 is not a file. Unknown paths get index.html and React
+    # Router renders the right page (or its own 404). index.html itself is never cached, so a new
+    # deployment is picked up on the next visit.
+    location / {
+        add_header Cache-Control "no-cache";
+        try_files $uri /index.html;
+    }
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+}

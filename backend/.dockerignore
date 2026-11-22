@@ -1,0 +1,5 @@
+# Keep the build context small and never send local builds or secrets to the Docker daemon.
+target/
+.idea/
+*.iml
+.env

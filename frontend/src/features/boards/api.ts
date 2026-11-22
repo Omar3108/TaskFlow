@@ -1,5 +1,6 @@
 import { apiFetch } from '../../lib/apiClient'
 import type { Board, BoardDetail, ColumnSummary } from '../../types/api'
+import { toApiQuery, type BoardFilters } from './filters'
 
 // ---------- boards ----------
 
@@ -18,8 +19,9 @@ export function createBoard(workspaceId: string, input: CreateBoardInput) {
   return apiFetch<Board>(`/workspaces/${workspaceId}/boards`, { method: 'POST', body: input })
 }
 
-export function getBoard(boardId: string) {
-  return apiFetch<BoardDetail>(`/boards/${boardId}`)
+/** The whole board; with filters, every column but only the matching cards. */
+export function getBoard(boardId: string, filters: BoardFilters = {}) {
+  return apiFetch<BoardDetail>(`/boards/${boardId}${toApiQuery(filters)}`)
 }
 
 /** Replaces name and description: a null description clears it. */

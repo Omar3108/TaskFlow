@@ -1,6 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { CardSummary } from '../../../types/api'
+import { LabelChip } from '../../labels/components/LabelChip'
 
 interface Props {
   card: CardSummary
@@ -42,11 +43,36 @@ export function CardItem({ card, onOpen }: Props) {
 export function CardContent({ card }: { card: CardSummary }) {
   return (
     <div className="flex flex-col gap-2">
+      {card.labels.length > 0 && (
+        <ul aria-label="Labels" className="flex flex-wrap gap-1">
+          {card.labels.map((label) => (
+            <li key={label.id} className="max-w-full">
+              <LabelChip label={label} />
+            </li>
+          ))}
+        </ul>
+      )}
       <span className="text-sm font-medium break-words text-slate-900">{card.title}</span>
-      {(card.dueDate || card.assignee) && (
+      {(card.dueDate || card.assignee || card.commentCount > 0) && (
         <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
-          <span>
+          <span className="flex items-center gap-3">
             {card.dueDate && <time dateTime={card.dueDate}>Due {formatDate(card.dueDate)}</time>}
+            {card.commentCount > 0 && (
+              <span
+                className="flex items-center gap-1"
+                aria-label={`${card.commentCount} comment${card.commentCount === 1 ? '' : 's'}`}
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="size-3.5"
+                >
+                  <path d="M3 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H8l-4 4v-4H5a2 2 0 0 1-2-2V4Z" />
+                </svg>
+                {card.commentCount}
+              </span>
+            )}
           </span>
           {card.assignee && (
             <span

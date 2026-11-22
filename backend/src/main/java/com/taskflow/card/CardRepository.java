@@ -4,11 +4,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface CardRepository extends JpaRepository<Card, UUID> {
+// JpaSpecificationExecutor adds findAll(Specification, Sort), used by the filtered board view.
+public interface CardRepository extends JpaRepository<Card, UUID>, JpaSpecificationExecutor<Card> {
 
     /**
      * Loads the card with everything a single-card operation needs (column and board to find
@@ -23,14 +25,12 @@ public interface CardRepository extends JpaRepository<Card, UUID> {
             """)
     Optional<Card> findByIdWithBoard(@Param("id") UUID id);
 
-    /** Every card of a board in display order: one query, however many columns there are. */
-    @Query("""
-            select c from Card c
-            left join fetch c.assignee
-            where c.column.board.id = :boardId
-            order by c.position, c.id
-            """)
-    List<Card> findAllByBoardIdWithAssignee(@Param("boardId") UUID boardId);
+    /**
+     * Every (card, label) pair of a board in one query. Mapping c.labels card by card would
+     * run one query per card (N+1).
+     */
+    @Query("select new com.taskflow.card.CardLabelRow(c.id, l) from Card c join c.labels l where c.column.board.id = :boardId")
+    List<CardLabelRow> findLabelsByBoardId(@Param("boardId") UUID boardId);
 
     List<Card> findAllByColumnIdOrderByPositionAscIdAsc(UUID columnId);
 

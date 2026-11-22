@@ -230,6 +230,7 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
           cardId={openCardId}
           boardId={board.id}
           workspaceId={board.workspaceId}
+          role={board.role}
           onClose={() => setOpenCardId(null)}
         />
       )}

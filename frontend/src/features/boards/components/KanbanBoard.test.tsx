@@ -1,9 +1,11 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
-import { fullCard, member, sampleBoard } from '../../../test/fixtures'
+import { BUG, fullCard, member, page, sampleBoard } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/renderWithProviders'
 import * as cardsApi from '../../cards/api'
+import * as commentsApi from '../../comments/api'
+import * as labelsApi from '../../labels/api'
 import * as workspacesApi from '../../workspaces/api'
 import * as api from '../api'
 import { KanbanBoard } from './KanbanBoard'
@@ -11,6 +13,8 @@ import { KanbanBoard } from './KanbanBoard'
 vi.mock('../api')
 vi.mock('../../cards/api')
 vi.mock('../../workspaces/api')
+vi.mock('../../labels/api')
+vi.mock('../../comments/api')
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -18,6 +22,8 @@ beforeEach(() => {
   vi.mocked(cardsApi.createCard).mockResolvedValue(fullCard())
   vi.mocked(cardsApi.getCard).mockResolvedValue(fullCard())
   vi.mocked(workspacesApi.listMembers).mockResolvedValue([member('u-ada', 'Ada')])
+  vi.mocked(labelsApi.listLabels).mockResolvedValue([BUG])
+  vi.mocked(commentsApi.listComments).mockResolvedValue(page([]))
   vi.mocked(api.createColumn).mockResolvedValue({
     id: 'new',
     boardId: 'board-1',
@@ -118,4 +124,17 @@ test('clicking a card opens it, and so does Enter', async () => {
   screen.getByRole('button', { name: 'B' }).focus()
   await user.keyboard('{Enter}')
   await vi.waitFor(() => expect(cardsApi.getCard).toHaveBeenCalledWith('b'))
+})
+
+test('cards show their labels and how many comments they have', () => {
+  const board = sampleBoard()
+  board.columns[0].cards[0] = { ...board.columns[0].cards[0], labels: [BUG], commentCount: 3 }
+  renderWithProviders(<KanbanBoard board={board} />)
+
+  const card = screen.getByRole('button', { name: 'A' })
+  expect(within(card).getByRole('list', { name: 'Labels' })).toHaveTextContent('Bug')
+  expect(within(card).getByLabelText('3 comments')).toBeInTheDocument()
+  expect(
+    within(screen.getByRole('button', { name: 'B' })).queryByRole('list'),
+  ).not.toBeInTheDocument()
 })

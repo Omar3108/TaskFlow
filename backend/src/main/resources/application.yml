@@ -22,6 +22,11 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  data:
+    web:
+      pageable:
+        # Upper bound for ?size=, so one request cannot ask for an unbounded page.
+        max-page-size: 100
 
 server:
   port: ${PORT:8080}

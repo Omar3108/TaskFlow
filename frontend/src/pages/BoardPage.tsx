@@ -1,14 +1,18 @@
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { Alert } from '../components/ui/Alert'
 import { BoardHeader } from '../features/boards/components/BoardHeader'
+import { FilterBar } from '../features/boards/components/FilterBar'
 import { KanbanBoard } from '../features/boards/components/KanbanBoard'
+import { hasFilters, readFilters, writeFilters } from '../features/boards/filters'
 import { useBoard } from '../features/boards/hooks'
 import { ApiError } from '../lib/apiClient'
 import { errorMessage } from '../lib/errors'
 
 export function BoardPage() {
   const { boardId = '' } = useParams()
-  const board = useBoard(boardId)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const filters = readFilters(searchParams)
+  const board = useBoard(boardId, filters)
 
   if (board.isPending) {
     return (
@@ -35,10 +39,31 @@ export function BoardPage() {
     )
   }
 
+  const filtered = hasFilters(filters)
+  const noMatches =
+    filtered &&
+    board.data.columns.length > 0 &&
+    board.data.columns.every((column) => column.cards.length === 0)
+
   return (
     <>
       <BoardHeader board={board.data} />
-      <KanbanBoard board={board.data} />
+      <FilterBar
+        boardId={board.data.id}
+        workspaceId={board.data.workspaceId}
+        filters={filters}
+        // replace: typing in the search box must not add one history entry per keystroke.
+        onChange={(next) => setSearchParams(writeFilters(next), { replace: true })}
+      />
+      {noMatches && (
+        <p role="status" className="mb-3 text-sm text-slate-600">
+          No cards match these filters.
+        </p>
+      )}
+      {/* Dimmed while the results of a new filter load (the previous ones stay visible). */}
+      <div className={board.isPlaceholderData ? 'opacity-60 transition-opacity' : undefined}>
+        <KanbanBoard board={board.data} />
+      </div>
     </>
   )
 }

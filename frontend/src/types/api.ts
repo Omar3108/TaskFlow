@@ -74,6 +74,14 @@ export interface Assignee {
   email: string
 }
 
+export type LabelColor = 'GRAY' | 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN' | 'BLUE' | 'PURPLE' | 'PINK'
+
+export interface Label {
+  id: string
+  name: string
+  color: LabelColor
+}
+
 /** A card as the board shows it: no description, to keep the board response small. */
 export interface CardSummary {
   id: string
@@ -83,6 +91,9 @@ export interface CardSummary {
   assignee: Assignee | null
   /** ISO date (yyyy-mm-dd). */
   dueDate: string | null
+  /** Alphabetical. */
+  labels: Label[]
+  commentCount: number
   version: number
 }
 
@@ -123,10 +134,32 @@ export interface Card {
   position: number
   assignee: Assignee | null
   dueDate: string | null
+  /** Alphabetical. */
+  labels: Label[]
   /** Optimistic-locking counter: sent back on edit, a stale value is rejected with 409. */
   version: number
   createdAt: string
   updatedAt: string
+}
+
+export interface Comment {
+  id: string
+  cardId: string
+  /** null when the author's account no longer exists. */
+  author: { id: string; displayName: string } | null
+  body: string
+  edited: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+/** One page of a paginated list. `page` is zero-based. */
+export interface Page<T> {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
 }
 
 /** RFC 9457 error body returned by the API for every failure. */

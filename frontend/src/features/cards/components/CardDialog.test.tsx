@@ -1,30 +1,48 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { ApiError } from '../../../lib/apiClient'
-import { fullCard, member } from '../../../test/fixtures'
+import { BUG, DOCS, comment, fullCard, member, page } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/renderWithProviders'
+import type { User, WorkspaceRole } from '../../../types/api'
+import * as commentsApi from '../../comments/api'
+import * as labelsApi from '../../labels/api'
 import * as workspacesApi from '../../workspaces/api'
 import * as api from '../api'
 import { CardDialog } from './CardDialog'
 
 vi.mock('../api')
 vi.mock('../../workspaces/api')
+vi.mock('../../labels/api')
+vi.mock('../../comments/api')
 
-function renderDialog(onClose = vi.fn()) {
+const ADA: User = {
+  id: 'u-ada',
+  email: 'ada@example.com',
+  displayName: 'Ada',
+  createdAt: '2026-01-01T00:00:00Z',
+}
+
+function renderDialog({
+  role = 'MEMBER',
+  onClose = vi.fn(),
+}: { role?: WorkspaceRole; onClose?: () => void } = {}) {
   renderWithProviders(
-    <CardDialog cardId="a" boardId="board-1" workspaceId="ws-1" onClose={onClose} />,
+    <CardDialog cardId="a" boardId="board-1" workspaceId="ws-1" role={role} onClose={onClose} />,
+    { auth: { status: 'authenticated', user: ADA } },
   )
   return onClose
 }
 
 beforeEach(() => {
   vi.resetAllMocks()
-  vi.mocked(api.getCard).mockResolvedValue(fullCard())
+  vi.mocked(api.getCard).mockResolvedValue(fullCard({ labels: [BUG] }))
   vi.mocked(workspacesApi.listMembers).mockResolvedValue([
     member('u-ada', 'Ada'),
     member('u-grace', 'Grace'),
   ])
+  vi.mocked(labelsApi.listLabels).mockResolvedValue([BUG, DOCS])
+  vi.mocked(commentsApi.listComments).mockResolvedValue(page([]))
 })
 
 test('shows the card and saves every field with the version it was read with', async () => {
@@ -37,12 +55,16 @@ test('shows the card and saves every field with the version it was read with', a
   expect(screen.getByLabelText('Description')).toHaveValue('Cover the board')
   expect(screen.getByLabelText('Due date')).toHaveValue('2027-01-31')
   await vi.waitFor(() => expect(screen.getByLabelText('Assignee')).toHaveValue('u-ada'))
+  expect(await screen.findByRole('checkbox', { name: 'Bug' })).toBeChecked()
+  expect(screen.getByRole('checkbox', { name: 'Docs' })).not.toBeChecked()
 
   await user.clear(title)
   await user.type(title, 'Ship it')
   await user.clear(screen.getByLabelText('Description'))
   await user.selectOptions(screen.getByLabelText('Assignee'), 'u-grace')
   await user.clear(screen.getByLabelText('Due date'))
+  await user.click(screen.getByRole('checkbox', { name: 'Bug' }))
+  await user.click(screen.getByRole('checkbox', { name: 'Docs' }))
   await user.click(screen.getByRole('button', { name: 'Save' }))
 
   await vi.waitFor(() =>
@@ -52,6 +74,7 @@ test('shows the card and saves every field with the version it was read with', a
       description: null,
       assigneeId: 'u-grace',
       dueDate: null,
+      labelIds: ['l-docs'],
       version: 1,
     }),
   )
@@ -119,4 +142,109 @@ test('a card that no longer exists says so', async () => {
   renderDialog()
 
   expect(await screen.findByRole('alert')).toHaveTextContent('This card no longer exists.')
+})
+
+// ---------------------------------------------------------------- comments
+
+const comments = () => screen.getByRole('region', { name: /Comments/ })
+// The section appears once the card has loaded.
+const waitForComments = () => screen.findByRole('region', { name: /Comments/ })
+
+test('lists the comments and posts a new one', async () => {
+  const user = userEvent.setup()
+  vi.mocked(commentsApi.listComments).mockResolvedValue(
+    page([comment('c-1', 'Second thought', { id: 'u-grace', displayName: 'Grace' })]),
+  )
+  vi.mocked(commentsApi.createComment).mockResolvedValue(
+    comment('c-2', 'On it', { id: 'u-ada', displayName: 'Ada' }),
+  )
+  renderDialog()
+  await waitForComments()
+
+  expect(await within(comments()).findByText('Second thought')).toBeInTheDocument()
+  expect(within(comments()).getByText('Grace')).toBeInTheDocument()
+  expect(comments()).toHaveTextContent('Comments (1)')
+  expect(commentsApi.listComments).toHaveBeenCalledWith('a', 0, 10)
+
+  const box = within(comments()).getByLabelText('Add a comment')
+  await user.type(box, '  On it  ')
+  await user.click(within(comments()).getByRole('button', { name: 'Comment' }))
+
+  await vi.waitFor(() => expect(commentsApi.createComment).toHaveBeenCalledWith('a', 'On it'))
+  await vi.waitFor(() => expect(box).toHaveValue(''))
+})
+
+test("authors edit their own comments; nobody edits someone else's", async () => {
+  const user = userEvent.setup()
+  vi.mocked(commentsApi.listComments).mockResolvedValue(
+    page([
+      comment('mine', 'Frist', { id: 'u-ada', displayName: 'Ada' }),
+      comment('theirs', 'Hello', { id: 'u-grace', displayName: 'Grace' }),
+      comment('orphan', 'Old note', null),
+    ]),
+  )
+  vi.mocked(commentsApi.updateComment).mockResolvedValue(
+    comment('mine', 'First', { id: 'u-ada', displayName: 'Ada' }),
+  )
+  renderDialog({ role: 'MEMBER' })
+  await waitForComments()
+
+  await within(comments()).findByText('Frist')
+  expect(within(comments()).getByText('Deleted user')).toBeInTheDocument()
+  expect(
+    within(comments()).queryByRole('button', { name: 'Edit comment by Grace' }),
+  ).not.toBeInTheDocument()
+  // A plain member cannot delete other people's comments either.
+  expect(
+    within(comments()).queryByRole('button', { name: 'Delete comment by Grace' }),
+  ).not.toBeInTheDocument()
+
+  await user.click(within(comments()).getByRole('button', { name: 'Edit comment by Ada' }))
+  const editor = within(comments()).getByLabelText('Edit comment')
+  await user.clear(editor)
+  await user.type(editor, 'First')
+  await user.click(within(comments()).getByRole('button', { name: 'Save' }))
+
+  await vi.waitFor(() => expect(commentsApi.updateComment).toHaveBeenCalledWith('mine', 'First'))
+})
+
+test('admins can delete any comment, after confirming', async () => {
+  const user = userEvent.setup()
+  vi.mocked(commentsApi.listComments).mockResolvedValue(
+    page([comment('theirs', 'Spam', { id: 'u-grace', displayName: 'Grace' })]),
+  )
+  vi.mocked(commentsApi.deleteComment).mockResolvedValue(undefined)
+  renderDialog({ role: 'ADMIN' })
+  await waitForComments()
+
+  await within(comments()).findByText('Spam')
+  expect(
+    within(comments()).queryByRole('button', { name: 'Edit comment by Grace' }),
+  ).not.toBeInTheDocument()
+  await user.click(within(comments()).getByRole('button', { name: 'Delete comment by Grace' }))
+  await user.click(within(comments()).getByRole('button', { name: 'Delete comment' }))
+
+  await vi.waitFor(() => expect(commentsApi.deleteComment).toHaveBeenCalledWith('theirs'))
+})
+
+test('older comments are loaded on demand', async () => {
+  const user = userEvent.setup()
+  vi.mocked(commentsApi.listComments).mockImplementation(async (_cardId, pageNumber) =>
+    pageNumber === 0
+      ? page([comment('new', 'Newest', null)], 0, 2, 2)
+      : page([comment('old', 'Oldest', null)], 1, 2, 2),
+  )
+  renderDialog()
+  await waitForComments()
+
+  await within(comments()).findByText('Newest')
+  expect(within(comments()).queryByText('Oldest')).not.toBeInTheDocument()
+
+  await user.click(within(comments()).getByRole('button', { name: 'Show older comments' }))
+
+  expect(await within(comments()).findByText('Oldest')).toBeInTheDocument()
+  expect(commentsApi.listComments).toHaveBeenCalledWith('a', 1, 10)
+  expect(
+    within(comments()).queryByRole('button', { name: 'Show older comments' }),
+  ).not.toBeInTheDocument()
 })

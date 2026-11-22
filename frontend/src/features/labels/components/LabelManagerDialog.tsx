@@ -11,6 +11,7 @@ import { LABEL_COLOR_VALUES, LABEL_COLORS } from '../colors'
 import { useCreateLabel, useDeleteLabel, useLabels, useUpdateLabel } from '../hooks'
 import { labelSchema, type LabelValues } from '../schemas'
 import { LabelChip } from './LabelChip'
+import { toast } from 'sonner'
 
 interface Props {
   boardId: string
@@ -71,6 +72,7 @@ function LabelManager({ boardId, onClose }: { boardId: string; onClose: () => vo
           onSubmit={async (values) => {
             try {
               await createLabel.mutateAsync(values)
+              toast.success(`Label ${values.name.trim()} created`)
               return true
             } catch {
               return false
@@ -136,7 +138,11 @@ function LabelRow({
               size="sm"
               variant="danger"
               loading={deleteLabel.isPending}
-              onClick={() => deleteLabel.mutate(label.id)}
+              onClick={() =>
+                deleteLabel.mutate(label.id, {
+                  onSuccess: () => toast.success(`Label ${label.name} deleted`),
+                })
+              }
             >
               Delete label
             </Button>
@@ -226,11 +232,11 @@ function LabelForm({ initial, submitLabel, pending, error, onSubmit, onCancel }:
         </div>
       </fieldset>
       <div className="flex gap-2">
-        <Button type="submit" size="sm" loading={pending}>
+        <Button type="submit" loading={pending}>
           {submitLabel}
         </Button>
         {onCancel && (
-          <Button size="sm" variant="secondary" onClick={onCancel}>
+          <Button variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
         )}

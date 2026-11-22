@@ -20,6 +20,9 @@ export function FilterBar({ boardId, workspaceId, filters, onChange }: Props) {
   const labels = useLabels(boardId)
   // The search box answers every keystroke; the URL (and so the request) follows after a pause.
   const [text, setText] = useState(filters.q ?? '')
+  // Phones show only the search box until "Filters" is tapped; wider screens show everything.
+  const [expanded, setExpanded] = useState(false)
+  const activeCount = [filters.assignee, filters.label, filters.due].filter(Boolean).length
   const timer = useRef<number | undefined>(undefined)
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
@@ -51,43 +54,57 @@ export function FilterBar({ boardId, workspaceId, filters, onChange }: Props) {
           className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-xs outline-none focus:ring-2 focus:ring-indigo-500"
         />
       </div>
-      <Select
-        label="Assignee"
-        value={filters.assignee ?? ''}
-        onChange={(event) => set({ assignee: event.target.value || undefined })}
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls="board-filters"
+        onClick={() => setExpanded((value) => !value)}
+        className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 sm:hidden"
       >
-        <option value="">Anyone</option>
-        <option value="none">Unassigned</option>
-        {members.data?.map((member) => (
-          <option key={member.userId} value={member.userId}>
-            {member.displayName}
-          </option>
-        ))}
-      </Select>
-      <Select
-        label="Label"
-        value={filters.label ?? ''}
-        onChange={(event) => set({ label: event.target.value || undefined })}
+        Filters{activeCount > 0 ? ` (${activeCount})` : ''}
+      </button>
+      <div
+        id="board-filters"
+        className={`${expanded ? 'flex' : 'hidden'} flex-col gap-3 sm:flex sm:flex-row sm:flex-wrap sm:items-end`}
       >
-        <option value="">Any label</option>
-        {labels.data?.map((label) => (
-          <option key={label.id} value={label.id}>
-            {label.name}
-          </option>
-        ))}
-      </Select>
-      <Select
-        label="Due"
-        value={filters.due ?? ''}
-        onChange={(event) =>
-          set({ due: (event.target.value || undefined) as DueFilter | undefined })
-        }
-      >
-        <option value="">Any date</option>
-        <option value="overdue">Overdue</option>
-        <option value="week">Due in the next 7 days</option>
-        <option value="none">No due date</option>
-      </Select>
+        <Select
+          label="Assignee"
+          value={filters.assignee ?? ''}
+          onChange={(event) => set({ assignee: event.target.value || undefined })}
+        >
+          <option value="">Anyone</option>
+          <option value="none">Unassigned</option>
+          {members.data?.map((member) => (
+            <option key={member.userId} value={member.userId}>
+              {member.displayName}
+            </option>
+          ))}
+        </Select>
+        <Select
+          label="Label"
+          value={filters.label ?? ''}
+          onChange={(event) => set({ label: event.target.value || undefined })}
+        >
+          <option value="">Any label</option>
+          {labels.data?.map((label) => (
+            <option key={label.id} value={label.id}>
+              {label.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          label="Due"
+          value={filters.due ?? ''}
+          onChange={(event) =>
+            set({ due: (event.target.value || undefined) as DueFilter | undefined })
+          }
+        >
+          <option value="">Any date</option>
+          <option value="overdue">Overdue</option>
+          <option value="week">Due in the next 7 days</option>
+          <option value="none">No due date</option>
+        </Select>
+      </div>
       {hasFilters({ ...filters, q: text }) && (
         <Button
           variant="secondary"

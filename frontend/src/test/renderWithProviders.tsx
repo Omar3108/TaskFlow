@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MemoryRouter } from 'react-router'
+import { Toaster } from 'sonner'
 import { vi } from 'vitest'
 import { AuthContext, type AuthContextValue } from '../features/auth/AuthContext'
 
@@ -22,6 +23,7 @@ export function renderWithProviders(ui: ReactElement, { auth = {}, route = '/' }
     login: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),
+    updateUser: vi.fn(),
     ...auth,
   }
   // A fresh client per test: no cache shared between tests, and no retries slowing failures.
@@ -35,6 +37,7 @@ export function renderWithProviders(ui: ReactElement, { auth = {}, route = '/' }
       <QueryClientProvider client={queryClient}>
         <AuthContext value={authValue}>
           <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>
+          <Toaster />
         </AuthContext>
       </QueryClientProvider>,
     ),

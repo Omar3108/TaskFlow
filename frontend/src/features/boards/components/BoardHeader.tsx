@@ -8,6 +8,7 @@ import { useDeleteBoard } from '../hooks'
 import { canManageBoards } from '../permissions'
 import { LabelManagerDialog } from '../../labels/components/LabelManagerDialog'
 import { BoardFormDialog } from './BoardFormDialog'
+import { toast } from 'sonner'
 
 export function BoardHeader({ board }: { board: BoardDetail }) {
   const navigate = useNavigate()
@@ -69,7 +70,10 @@ export function BoardHeader({ board }: { board: BoardDetail }) {
         }}
         onConfirm={() =>
           deleteBoard.mutate(undefined, {
-            onSuccess: () => navigate(`/workspaces/${board.workspaceId}`, { replace: true }),
+            onSuccess: () => {
+              toast.success(`Board ${board.name} deleted`)
+              navigate(`/workspaces/${board.workspaceId}`, { replace: true })
+            },
           })
         }
       >

@@ -136,3 +136,20 @@ test('says so when no card matches the filters', async () => {
 
   expect(await screen.findByText('No cards match these filters.')).toBeInTheDocument()
 })
+
+test('on small screens the filters fold behind a button that counts the active ones', async () => {
+  const user = userEvent.setup()
+  renderBoardPage('/boards/board-1?label=l-bug&due=week')
+
+  const toggle = await screen.findByRole('button', { name: 'Filters (2)' })
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await user.click(toggle)
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+})
+
+test('the tab title follows the board name', async () => {
+  renderBoardPage()
+
+  await screen.findByRole('heading', { name: 'Roadmap' })
+  expect(document.title).toBe('Roadmap · TaskFlow')
+})

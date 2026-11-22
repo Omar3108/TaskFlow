@@ -3,7 +3,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type Announcements,
@@ -19,6 +20,8 @@ import {
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable'
 import { useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
+import { toast } from 'sonner'
 import { Alert } from '../../../components/ui/Alert'
 import { errorMessage } from '../../../lib/errors'
 import type { BoardDetail } from '../../../types/api'
@@ -52,7 +55,35 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
   const canManage = canManageBoards(board.role)
   const moveCard = useMoveCard(board.id)
   const moveColumn = useMoveColumn(board.id)
-  const [openCardId, setOpenCardId] = useState<string | null>(null)
+  // The open card lives in the URL (?card=<id>): a link to it can be shared, a reload keeps it
+  // open, and the browser's Back button closes it.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const openCardId = searchParams.get('card')
+  const openCard = (cardId: string) =>
+    setSearchParams(
+      (params) => {
+        params.set('card', cardId)
+        return params
+      },
+      { state: { cardOpenedHere: true } },
+    )
+  const closeCard = () => {
+    // Opened from this board: going back removes the entry that opening it added. Opened from
+    // a shared link: there is nothing to go back to, so just drop the parameter.
+    if ((location.state as { cardOpenedHere?: boolean } | null)?.cardOpenedHere) {
+      navigate(-1)
+    } else {
+      setSearchParams(
+        (params) => {
+          params.delete('card')
+          return params
+        },
+        { replace: true },
+      )
+    }
+  }
   const [active, setActive] = useState<{ type: DragType; id: string } | null>(null)
 
   // The arrangement while dragging. It is tied to the board it was made from: as soon as the
@@ -63,8 +94,10 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
   const shown = draft && draft.base === board ? draft.board : board
 
   const sensors = useSensors(
-    // A few pixels of movement before a drag starts, so a plain click still opens the card.
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    // Mouse: a few pixels of movement before a drag starts, so a plain click still opens the card.
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    // Touch: a short press-and-hold starts the drag, so a normal swipe still scrolls the board.
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
       // Enter is kept for opening a card, so only Space picks one up.
@@ -137,7 +170,7 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
       }
       const final = moveColumnTo(board, id, toIndex)
       setDraft({ base: board, board: final })
-      moveColumn.mutate(columnMoveFor(final, id)!)
+      moveColumn.mutate(columnMoveFor(final, id)!, { onError: showMoveError })
       return
     }
 
@@ -155,7 +188,12 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
       return
     }
     setDraft({ base: board, board: final })
-    moveCard.mutate(cardMoveFor(final, id)!)
+    moveCard.mutate(cardMoveFor(final, id)!, { onError: showMoveError })
+  }
+
+  // The board has already been rolled back to the server state when this runs.
+  function showMoveError(error: Error) {
+    toast.error(`The move could not be saved. ${errorMessage(error)}`)
   }
 
   function handleDragCancel() {
@@ -163,7 +201,6 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
     setDraft(null)
   }
 
-  const moveError = moveCard.error ?? moveColumn.error
   const activeCard =
     active?.type === 'card'
       ? shown.columns.flatMap((column) => column.cards).find((card) => card.id === active.id)
@@ -173,8 +210,6 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {moveError && <Alert>The move could not be saved: {errorMessage(moveError)}</Alert>}
-
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
@@ -184,7 +219,7 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex items-start gap-4 overflow-x-auto pb-4">
+        <div className="flex snap-x snap-mandatory items-start gap-4 overflow-x-auto pb-4 sm:snap-none">
           <SortableContext
             items={shown.columns.map((column) => column.id)}
             strategy={horizontalListSortingStrategy}
@@ -195,7 +230,7 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
                 boardId={board.id}
                 column={column}
                 canManage={canManage}
-                onOpenCard={setOpenCardId}
+                onOpenCard={openCard}
               />
             ))}
           </SortableContext>
@@ -231,7 +266,7 @@ export function KanbanBoard({ board }: { board: BoardDetail }) {
           boardId={board.id}
           workspaceId={board.workspaceId}
           role={board.role}
-          onClose={() => setOpenCardId(null)}
+          onClose={closeCard}
         />
       )}
     </div>

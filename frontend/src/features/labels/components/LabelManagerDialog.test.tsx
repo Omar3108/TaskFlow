@@ -44,6 +44,7 @@ test('creates a label with the chosen colour and clears the form', async () => {
     expect(api.createLabel).toHaveBeenCalledWith('board-1', { name: 'Urgent', color: 'PINK' }),
   )
   await vi.waitFor(() => expect(name).toHaveValue(''))
+  expect(await screen.findByText('Label Urgent created')).toBeInTheDocument()
 })
 
 test('shows the server message for a duplicate name', async () => {

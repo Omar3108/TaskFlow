@@ -1,10 +1,13 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
+import { Route, Routes } from 'react-router'
 import { ProtectedRoute, PublicOnlyRoute } from '../features/auth/components/RouteGuards'
+import { BoardSkeleton } from '../features/boards/components/BoardSkeleton'
+import { AccountPage } from '../pages/AccountPage'
 import { AppLayout } from '../pages/AppLayout'
 import { HomePage } from '../pages/HomePage'
 import { InvitePage } from '../pages/InvitePage'
 import { LoginPage } from '../pages/LoginPage'
+import { NotFoundPage } from '../pages/NotFoundPage'
 import { RegisterPage } from '../pages/RegisterPage'
 import { WorkspacePage } from '../pages/WorkspacePage'
 
@@ -27,22 +30,17 @@ export function AppRoutes() {
           <Route
             path="/boards/:boardId"
             element={
-              <Suspense
-                fallback={
-                  <p role="status" className="text-sm text-slate-500">
-                    Loading board…
-                  </p>
-                }
-              >
+              <Suspense fallback={<BoardSkeleton />}>
                 <BoardPage />
               </Suspense>
             }
           />
           <Route path="/invite/:token" element={<InvitePage />} />
+          <Route path="/account" element={<AccountPage />} />
+          {/* Inside the protected layout: signed-out visitors are sent to log in first. */}
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>
-
-      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

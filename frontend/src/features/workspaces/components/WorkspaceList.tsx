@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
+import { TileGridSkeleton } from '../../../components/ui/Skeleton'
 import { errorMessage } from '../../../lib/errors'
 import { useWorkspaces } from '../hooks'
 import { RoleBadge } from './RoleBadge'
@@ -8,13 +9,7 @@ import { RoleBadge } from './RoleBadge'
 export function WorkspaceList({ onCreateClick }: { onCreateClick: () => void }) {
   const workspaces = useWorkspaces()
 
-  if (workspaces.isPending) {
-    return (
-      <p role="status" className="text-sm text-slate-500">
-        Loading workspaces…
-      </p>
-    )
-  }
+  if (workspaces.isPending) return <TileGridSkeleton label="Loading workspaces…" />
   if (workspaces.isError) {
     return <Alert>{errorMessage(workspaces.error)}</Alert>
   }

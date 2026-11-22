@@ -15,7 +15,7 @@ interface Props {
   workspace: Workspace
   currentUserId: string
   /** Called after the workspace was deleted or left: it is no longer accessible. */
-  onGone: () => void
+  onGone: (message: string) => void
 }
 
 export function WorkspaceSettings({ workspace, currentUserId, onGone }: Props) {
@@ -99,7 +99,9 @@ export function WorkspaceSettings({ workspace, currentUserId, onGone }: Props) {
         loading={deleteWorkspace.isPending}
         error={deleteWorkspace.isError ? errorMessage(deleteWorkspace.error) : null}
         onCancel={closeDialog}
-        onConfirm={() => deleteWorkspace.mutate(undefined, { onSuccess: onGone })}
+        onConfirm={() =>
+          deleteWorkspace.mutate(undefined, { onSuccess: () => onGone('Workspace deleted') })
+        }
       >
         <span className="font-medium">{workspace.name}</span> and everything in it will be
         permanently deleted. This cannot be undone.
@@ -112,7 +114,11 @@ export function WorkspaceSettings({ workspace, currentUserId, onGone }: Props) {
         loading={leave.isPending}
         error={leave.isError ? errorMessage(leave.error) : null}
         onCancel={closeDialog}
-        onConfirm={() => leave.mutate(currentUserId, { onSuccess: onGone })}
+        onConfirm={() =>
+          leave.mutate(currentUserId, {
+            onSuccess: () => onGone(`You left ${workspace.name}`),
+          })
+        }
       >
         You will lose access to <span className="font-medium">{workspace.name}</span>.
       </ConfirmDialog>

@@ -1,10 +1,11 @@
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { z } from 'zod'
 import { Alert } from '../../../components/ui/Alert'
-import { Button } from '../../../components/ui/Button'
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog'
+import { Menu } from '../../../components/ui/Menu'
 import { errorMessage } from '../../../lib/errors'
 import type { BoardColumn } from '../../../types/api'
 import { CardItem } from '../../cards/components/CardItem'
@@ -50,7 +51,7 @@ export function ColumnView({ boardId, column, canManage, onOpenCard }: Props) {
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       aria-label={column.name}
-      className={`flex max-h-full w-72 shrink-0 flex-col gap-3 rounded-xl bg-slate-100 p-3 ${
+      className={`flex max-h-full w-[85vw] max-w-72 shrink-0 snap-start flex-col sm:w-72 gap-3 rounded-xl bg-slate-100 p-3 ${
         isDragging ? 'opacity-40' : ''
       }`}
     >
@@ -92,24 +93,23 @@ export function ColumnView({ boardId, column, canManage, onOpenCard }: Props) {
               <span className="font-normal text-slate-500">{column.cards.length}</span>
             </h2>
             {canManage && (
-              <div className="flex shrink-0 gap-1">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  aria-label={`Rename column ${column.name}`}
-                  onClick={() => setMode('renaming')}
-                >
-                  Rename
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  aria-label={`Delete column ${column.name}`}
-                  onClick={() => setConfirmingDelete(true)}
-                >
-                  Delete
-                </Button>
-              </div>
+              // One "⋯" menu instead of two buttons per column keeps the headers quiet.
+              <Menu
+                label={`Column actions for ${column.name}`}
+                trigger={
+                  <span
+                    aria-hidden="true"
+                    className="block px-2 py-0.5 text-lg leading-none text-slate-500 hover:text-slate-900"
+                  >
+                    ⋯
+                  </span>
+                }
+                triggerClassName="hover:bg-slate-200"
+                items={[
+                  { label: 'Rename', onSelect: () => setMode('renaming') },
+                  { label: 'Delete', onSelect: () => setConfirmingDelete(true), danger: true },
+                ]}
+              />
             )}
           </>
         )}
@@ -166,7 +166,12 @@ export function ColumnView({ boardId, column, canManage, onOpenCard }: Props) {
           deleteColumn.reset()
         }}
         onConfirm={() =>
-          deleteColumn.mutate(column.id, { onSuccess: () => setConfirmingDelete(false) })
+          deleteColumn.mutate(column.id, {
+            onSuccess: () => {
+              setConfirmingDelete(false)
+              toast.success(`Column ${column.name} deleted`)
+            },
+          })
         }
       >
         Delete <strong>{column.name}</strong>

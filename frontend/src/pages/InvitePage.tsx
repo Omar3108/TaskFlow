@@ -6,9 +6,11 @@ import { useAcceptInvitationByToken, useInvitationPreview } from '../features/wo
 import { ROLE_LABELS } from '../features/workspaces/permissions'
 import { ApiError } from '../lib/apiClient'
 import { errorMessage } from '../lib/errors'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 /** Target of an invitation link. Reached only when signed in (the route is protected). */
 export function InvitePage() {
+  useDocumentTitle('Invitation')
   const { token = '' } = useParams()
   const { user, logout } = useAuth()
   const navigate = useNavigate()

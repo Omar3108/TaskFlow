@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'react-router'
 import { LoginForm } from '../features/auth/components/LoginForm'
 import { AuthLayout } from './AuthLayout'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 export function LoginPage() {
+  useDocumentTitle('Sign in')
   const location = useLocation()
 
   return (

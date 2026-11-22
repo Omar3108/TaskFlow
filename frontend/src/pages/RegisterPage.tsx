@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'react-router'
 import { RegisterForm } from '../features/auth/components/RegisterForm'
 import { AuthLayout } from './AuthLayout'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 export function RegisterPage() {
+  useDocumentTitle('Create account')
   const location = useLocation()
 
   return (

@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { CardSummary } from '../../../types/api'
 import { LabelChip } from '../../labels/components/LabelChip'
+import { dueStatus, type DueStatus } from '../dueDate'
 
 interface Props {
   card: CardSummary
@@ -30,7 +31,7 @@ export function CardItem({ card, onOpen }: Props) {
         if (event.key === 'Enter' && !isDragging) onOpen(card.id)
       }}
       aria-label={card.title}
-      className={`cursor-grab touch-none rounded-lg border border-slate-200 bg-white p-3 text-left shadow-xs outline-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+      className={`cursor-grab touch-manipulation rounded-lg border border-slate-200 bg-white p-3 text-left shadow-xs outline-none hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-indigo-500 ${
         isDragging ? 'opacity-40' : ''
       }`}
     >
@@ -56,7 +57,7 @@ export function CardContent({ card }: { card: CardSummary }) {
       {(card.dueDate || card.assignee || card.commentCount > 0) && (
         <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
           <span className="flex items-center gap-3">
-            {card.dueDate && <time dateTime={card.dueDate}>Due {formatDate(card.dueDate)}</time>}
+            {card.dueDate && <DueDate date={card.dueDate} />}
             {card.commentCount > 0 && (
               <span
                 className="flex items-center gap-1"
@@ -104,4 +105,22 @@ function formatDate(isoDate: string) {
     month: 'short',
     day: 'numeric',
   })
+}
+
+const DUE_STYLES: Record<DueStatus, string> = {
+  overdue: 'rounded bg-red-100 px-1 font-medium text-red-800',
+  soon: 'rounded bg-amber-100 px-1 font-medium text-amber-900',
+  later: '',
+}
+
+function DueDate({ date }: { date: string }) {
+  const status = dueStatus(date)
+  return (
+    <time dateTime={date} className={DUE_STYLES[status]}>
+      Due {formatDate(date)}
+      {/* Colour alone is not enough: screen readers (and colour-blind users) get the words. */}
+      {status === 'overdue' && <span className="sr-only"> (overdue)</span>}
+      {status === 'soon' && <span className="sr-only"> (due soon)</span>}
+    </time>
+  )
 }

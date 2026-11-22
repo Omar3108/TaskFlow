@@ -285,6 +285,7 @@ function AddColumn({ boardId }: { boardId: string }) {
             label="Name of the new column"
             schema={columnNameSchema}
             submitLabel="Add column"
+            clearOnSubmit
             pending={createColumn.isPending}
             onCancel={() => setAdding(false)}
             onSubmit={async (name) => {

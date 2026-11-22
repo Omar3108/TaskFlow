@@ -158,11 +158,18 @@ Environment notes:
   `due=OVERDUE|WEEK|NONE` (UTC), combined with AND via JPA Specifications
   (`CardSpecifications`). All columns are returned, only matching cards. Card summaries carry
   `labels` and `commentCount`, read with one bulk query each.
+- **Filters and comments UI:** board filters live in the URL (`?q=&assignee=<id>|none&label=&due=
+  overdue|week|none`, `features/boards/filters.ts` translates URL ↔ API); search is debounced
+  300 ms and written with `replace`. Each filter combination is its own cache entry under
+  `queryKeys.boards.detail(boardId)` (`keepPreviousData` while switching); moves update every
+  cached variant. Comments use `useInfiniteQuery` ("Show older comments") and are invalidated
+  after any change because offset pages shift. Label colours map to static Tailwind classes in
+  `features/labels/colors.ts`.
 - **Resource 404s:** a non-member gets the same 404 body as for a missing id ("Board not
   found", "Column not found", "Card not found"), via `WorkspaceAccessService.requireRole(...,
   notFoundMessage)`.
 - **Code layout:** package-by-feature in the backend (`auth`, `user`, `workspace`, `board`,
-  `card`, `security`, `common`); feature folders in the frontend (`src/app`, `src/features/*`,
+  `card`, `label`, `comment`, `security`, `common`); feature folders in the frontend (`src/app`, `src/features/*`,
   `src/pages`, `src/components/ui`, `src/lib`, `src/types`, `src/test`).
 
 ## Commands
@@ -182,7 +189,8 @@ Board, column and card tests extend `BoardTestSupport` (`createTeam`, `createBoa
 `createColumn`, `createCard`, `createLabel`, `comment`, `editCard`, `moveCard`, `cardTitles`).
 Frontend component tests mock the feature's `api.ts` module with `vi.mock` and render through
 `src/test/renderWithProviders.tsx`.
-Shared API-shape builders (`sampleBoard`, `fullCard`, `member`) live in `src/test/fixtures.ts`.
+Shared API-shape builders (`sampleBoard`, `fullCard`, `member`, `comment`, `page`, `BUG`, `DOCS`)
+live in `src/test/fixtures.ts`.
 
 ## Phase status
 
@@ -192,7 +200,7 @@ Shared API-shape builders (`sampleBoard`, `fullCard`, `member`) live in `src/tes
 | 1 | Authentication (security code written by Claude at Omar's request) | Done |
 | 2 | Workspaces and members | Done |
 | 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | Done |
-| 4 | Labels, comments, search and filters | In progress — 4a backend done; 4b frontend pending |
+| 4 | Labels, comments, search and filters | Done — pending merge |
 | 5 | Frontend polish | Not started |
 | 6 | Testing (70%+ backend coverage, component tests, Playwright) | Not started |
 | 7 | Docker, CI/CD and deployment, demo user | Not started |

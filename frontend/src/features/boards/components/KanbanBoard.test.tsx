@@ -1,5 +1,6 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useLocation } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { BUG, fullCard, member, page, sampleBoard } from '../../../test/fixtures'
 import { renderWithProviders } from '../../../test/renderWithProviders'
@@ -37,7 +38,10 @@ const column = (name: string) => screen.getByRole('region', { name })
 test('shows the columns in order with their cards in order', () => {
   renderWithProviders(<KanbanBoard board={sampleBoard()} />)
 
-  const columns = screen.getAllByRole('region')
+  // The toaster is a region too; keep only the columns.
+  const columns = screen
+    .getAllByRole('region')
+    .filter((region) => !region.getAttribute('aria-label')?.startsWith('Notifications'))
   expect(columns.map((c) => c.getAttribute('aria-label'))).toEqual(['To do', 'Done', 'Empty'])
   const cards = within(column('To do')).getAllByRole('button', { name: /^[ABC]$/ })
   expect(cards.map((card) => card.textContent)).toEqual(['A', 'B', 'C'])
@@ -49,8 +53,7 @@ test('a plain member can add cards but not manage columns', () => {
 
   expect(within(column('To do')).getByRole('button', { name: '+ Add card' })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: '+ Add column' })).not.toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: /^Rename column/ })).not.toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: /^Delete column/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^Column actions/ })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /^Move column/ })).not.toBeInTheDocument()
 })
 
@@ -58,8 +61,8 @@ test('an admin sees the column controls', () => {
   renderWithProviders(<KanbanBoard board={sampleBoard('ADMIN')} />)
 
   expect(screen.getByRole('button', { name: '+ Add column' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Rename column To do' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Delete column Done' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Column actions for To do' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Column actions for Done' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Move column Empty' })).toBeInTheDocument()
 })
 
@@ -101,7 +104,8 @@ test('deleting a column asks for confirmation and mentions its cards', async () 
   vi.mocked(api.deleteColumn).mockResolvedValue(undefined)
   renderWithProviders(<KanbanBoard board={sampleBoard('ADMIN')} />)
 
-  await user.click(screen.getByRole('button', { name: 'Delete column To do' }))
+  await user.click(screen.getByRole('button', { name: 'Column actions for To do' }))
+  await user.click(screen.getByRole('menuitem', { name: 'Delete' }))
   const dialog = screen.getByRole('dialog', { name: 'Delete column' })
   expect(dialog).toHaveTextContent('Delete To do and its 3 cards?')
   await user.click(within(dialog).getByRole('button', { name: 'Delete column' }))
@@ -138,3 +142,62 @@ test('cards show their labels and how many comments they have', () => {
     within(screen.getByRole('button', { name: 'B' })).queryByRole('list'),
   ).not.toBeInTheDocument()
 })
+
+test('the column menu renames a column', async () => {
+  const user = userEvent.setup()
+  vi.mocked(api.renameColumn).mockResolvedValue({
+    id: 'done',
+    boardId: 'board-1',
+    name: 'Shipped',
+    position: 2048,
+  })
+  renderWithProviders(<KanbanBoard board={sampleBoard('ADMIN')} />)
+
+  await user.click(screen.getByRole('button', { name: 'Column actions for Done' }))
+  await user.click(screen.getByRole('menuitem', { name: 'Rename' }))
+  const input = screen.getByLabelText('New name for Done')
+  await user.clear(input)
+  await user.type(input, 'Shipped{Enter}')
+
+  await vi.waitFor(() => expect(api.renameColumn).toHaveBeenCalledWith('done', 'Shipped'))
+})
+
+test('opening a card puts it in the URL, and a card in the URL opens on load', async () => {
+  const user = userEvent.setup()
+  renderWithProviders(
+    <>
+      <KanbanBoard board={sampleBoard()} />
+      <CurrentSearch />
+    </>,
+  )
+
+  await user.click(screen.getByRole('button', { name: 'B' }))
+
+  expect(screen.getByRole('status', { name: 'Current search' })).toHaveTextContent('?card=b')
+  expect(await screen.findByRole('dialog', { name: 'Card details' })).toBeInTheDocument()
+  await vi.waitFor(() => expect(cardsApi.getCard).toHaveBeenCalledWith('b'))
+})
+
+test('a shared link to a card opens it, and closing it removes the parameter', async () => {
+  const user = userEvent.setup()
+  renderWithProviders(
+    <>
+      <KanbanBoard board={sampleBoard()} />
+      <CurrentSearch />
+    </>,
+    { route: '/boards/board-1?card=x' },
+  )
+
+  const dialog = await screen.findByRole('dialog', { name: 'Card details' })
+  await vi.waitFor(() => expect(cardsApi.getCard).toHaveBeenCalledWith('x'))
+  await user.click(await within(dialog).findByRole('button', { name: 'Cancel' }))
+
+  await vi.waitFor(() =>
+    expect(screen.queryByRole('dialog', { name: 'Card details' })).not.toBeInTheDocument(),
+  )
+  expect(screen.getByRole('status', { name: 'Current search' })).toHaveTextContent('')
+})
+
+function CurrentSearch() {
+  return <output aria-label="Current search">{useLocation().search}</output>
+}

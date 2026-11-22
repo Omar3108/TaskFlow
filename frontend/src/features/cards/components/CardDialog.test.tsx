@@ -135,6 +135,7 @@ test('deleting asks for confirmation first', async () => {
 
   await vi.waitFor(() => expect(api.deleteCard).toHaveBeenCalledWith('a'))
   await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
+  expect(await screen.findByText('Card deleted')).toBeInTheDocument()
 })
 
 test('a card that no longer exists says so', async () => {

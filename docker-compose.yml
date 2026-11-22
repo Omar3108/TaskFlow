@@ -1,5 +1,5 @@
-# Local development infrastructure.
-# The API and frontend services are added in the Docker/deployment phase.
+# `docker compose up -d`                      -> PostgreSQL only (develop with Vite + the API locally)
+# `docker compose --profile app up -d --build` -> the whole app on http://localhost:${WEB_PORT:-3000}
 services:
   postgres:
     image: postgres:17-alpine
@@ -17,6 +17,41 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    # Only started with --profile app, so plain `docker compose up` stays database-only.
+    profiles: [app]
+    build: ./backend
+    container_name: taskflow-api
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-taskflow}
+      DB_USERNAME: ${POSTGRES_USER:-taskflow}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-taskflow}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env (see .env.example)}
+      # Plain HTTP on localhost: the refresh cookie cannot require HTTPS here.
+      COOKIE_SECURE: "false"
+      # Browsers send an Origin header even on same-origin POSTs proxied by nginx.
+      CORS_ALLOWED_ORIGINS: http://localhost:${WEB_PORT:-3000}
+      PORT: 8080
+    # Not published: the browser reaches the API only through the web container.
+    expose:
+      - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    profiles: [app]
+    build: ./frontend
+    container_name: taskflow-web
+    environment:
+      API_UPSTREAM: http://api:8080
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    depends_on:
+      # The healthcheck in backend/Dockerfile reports when the API is ready.
+      api:
+        condition: service_healthy
 
 volumes:
   postgres-data:

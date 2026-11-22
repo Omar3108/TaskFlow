@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router'
 import { expect, test } from 'vitest'
 import { renderWithProviders } from '../../../test/renderWithProviders'
 import type { AuthStatus } from '../AuthContext'
+import { useRedirectTarget } from '../redirect'
 import { ProtectedRoute, PublicOnlyRoute } from './RouteGuards'
 
 function renderRoutes(status: AuthStatus, route: string) {
@@ -45,3 +46,21 @@ test('a signed-in user is redirected away from the login page', () => {
 
   expect(screen.getByText('Private page')).toBeInTheDocument()
 })
+
+test('the page to return to keeps its query string (a shared card link, filters)', async () => {
+  renderWithProviders(
+    <Routes>
+      <Route element={<ProtectedRoute />}>
+        <Route path="/boards/:boardId" element={<p>Board</p>} />
+      </Route>
+      <Route path="/login" element={<ReturnTarget />} />
+    </Routes>,
+    { route: '/boards/b-1?card=c-1&label=l-1', auth: { status: 'unauthenticated' } },
+  )
+
+  expect(await screen.findByText('/boards/b-1?card=c-1&label=l-1')).toBeInTheDocument()
+})
+
+function ReturnTarget() {
+  return <p>{useRedirectTarget()}</p>
+}

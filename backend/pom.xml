@@ -142,11 +142,20 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
-            <!-- Coverage report at target/site/jacoco. The 70% gate is enforced in the testing phase. -->
+            <!-- Coverage report at target/site/jacoco; `verify` fails below the minimums in `check`. -->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${jacoco.version}</version>
+                <configuration>
+                    <excludes>
+                        <!-- Code we do not write: MapStruct generates the mapper implementations
+                             (their many null checks would distort the numbers), and main() only
+                             starts Spring. -->
+                        <exclude>**/*MapperImpl.class</exclude>
+                        <exclude>com/taskflow/TaskflowApplication.class</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -160,6 +169,35 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
+                    </execution>
+                    <!-- The gate: a change that drops coverage below these minimums fails the build
+                         (locally and in CI). Set below the current values (about 96% of lines and
+                         84% of branches) so that it catches untested features, not noise. -->
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.70</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

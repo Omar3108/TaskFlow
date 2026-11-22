@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { Alert } from '../../../components/ui/Alert'
 import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
@@ -119,6 +119,7 @@ function CardForm({
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors },
   } = useForm<CardValues>({
@@ -132,9 +133,13 @@ function CardForm({
     },
   })
 
-  const onSubmit = handleSubmit((values) =>
-    updateCard.mutate(
-      {
+  // mutateAsync rather than mutate(..., { onSuccess }): saving stores a new version in the
+  // cache, which remounts this form (key={version}) before the request has fully settled, and
+  // TanStack Query drops the per-call callbacks of an unmounted component. The promise still
+  // resolves, so closing the dialog and the toast do not depend on this component surviving.
+  const onSubmit = handleSubmit(async (values) => {
+    try {
+      await updateCard.mutateAsync({
         title: values.title,
         description: emptyToNull(values.description),
         assigneeId: values.assigneeId || null,
@@ -142,15 +147,24 @@ function CardForm({
         labelIds: values.labelIds,
         // The version this form was filled from: if somebody saved since, the server says 409.
         version: card.version,
-      },
-      {
-        onSuccess: () => {
-          toast.success('Card saved')
-          onClose()
-        },
-      },
-    ),
-  )
+      })
+    } catch {
+      // Shown by the alert below (updateCard.error); nothing else to do here.
+      return
+    }
+    toast.success('Card saved')
+    onClose()
+  })
+
+  const onDelete = async () => {
+    try {
+      await deleteCard.mutateAsync(card.id)
+    } catch {
+      return
+    }
+    toast.success('Card deleted')
+    onClose()
+  }
 
   const conflict = updateCard.error instanceof ApiError && updateCard.error.status === 409
 
@@ -201,19 +215,35 @@ function CardForm({
         {boardLabels.length === 0 ? (
           <p className="text-sm text-slate-500">This board has no labels yet.</p>
         ) : (
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {boardLabels.map((label) => (
-              <label key={label.id} className="flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  value={label.id}
-                  className="size-4 rounded border-slate-300"
-                  {...register('labelIds')}
-                />
-                <LabelChip label={label} />
-              </label>
-            ))}
-          </div>
+          // Controlled on purpose: with register(), React Hook Form returns a list for several
+          // checkboxes of the same name but a single string (or false) when there is only one,
+          // so a board with one label could not save. Here the value is always a list.
+          <Controller
+            control={control}
+            name="labelIds"
+            render={({ field }) => (
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {boardLabels.map((label) => (
+                  <label key={label.id} className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={field.value.includes(label.id)}
+                      onChange={(event) =>
+                        field.onChange(
+                          event.target.checked
+                            ? [...field.value, label.id]
+                            : field.value.filter((id) => id !== label.id),
+                        )
+                      }
+                      onBlur={field.onBlur}
+                      className="size-4 rounded border-slate-300"
+                    />
+                    <LabelChip label={label} />
+                  </label>
+                ))}
+              </div>
+            )}
+          />
         )}
       </fieldset>
 
@@ -226,14 +256,7 @@ function CardForm({
               variant="danger"
               size="sm"
               loading={deleteCard.isPending}
-              onClick={() =>
-                deleteCard.mutate(card.id, {
-                  onSuccess: () => {
-                    toast.success('Card deleted')
-                    onClose()
-                  },
-                })
-              }
+              onClick={() => void onDelete()}
             >
               Delete card
             </Button>

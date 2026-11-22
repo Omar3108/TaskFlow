@@ -9,7 +9,12 @@ interface Props {
   initialValue?: string
   submitLabel: string
   pending: boolean
-  /** Return true to keep the form open and empty (to add several items in a row). */
+  /**
+   * Adding several items in a row: the field is emptied as soon as the value is sent, so the
+   * next title can be typed while the previous one is still saving.
+   */
+  clearOnSubmit?: boolean
+  /** Return false when saving failed; with clearOnSubmit the value is then put back. */
   onSubmit: (name: string) => Promise<boolean> | boolean
   onCancel: () => void
 }
@@ -21,6 +26,7 @@ export function InlineNameForm({
   initialValue = '',
   submitLabel,
   pending,
+  clearOnSubmit = false,
   onSubmit,
   onCancel,
 }: Props) {
@@ -29,6 +35,8 @@ export function InlineNameForm({
     handleSubmit,
     reset,
     setFocus,
+    getValues,
+    setValue,
     formState: { errors },
   } = useForm<{ name: string }>({
     resolver: zodResolver(schema),
@@ -36,10 +44,17 @@ export function InlineNameForm({
   })
 
   const submit = handleSubmit(async ({ name }) => {
-    if (await onSubmit(name)) {
-      reset({ name: '' })
-      setFocus('name')
+    if (!clearOnSubmit) {
+      await onSubmit(name)
+      return
     }
+    // Empty the field before the request, not after it: emptying it when the request finishes
+    // would erase whatever was typed in the meantime (a fast typer's next title).
+    reset({ name: '' })
+    setFocus('name')
+    const saved = await onSubmit(name)
+    // On failure, give the text back, unless the user has already started typing something new.
+    if (!saved && getValues('name') === '') setValue('name', name)
   })
 
   return (
@@ -69,7 +84,9 @@ export function InlineNameForm({
       />
       {errors.name && <p className="text-xs text-red-600">{errors.name.message}</p>}
       <div className="flex gap-2">
-        <Button type="submit" size="sm" loading={pending}>
+        {/* Not disabled while adding: a disabled submit button also blocks submitting with
+            Enter, and adding several items in a row is the point of clearOnSubmit. */}
+        <Button type="submit" size="sm" loading={pending && !clearOnSubmit}>
           {submitLabel}
         </Button>
         <Button size="sm" variant="secondary" onClick={onCancel}>

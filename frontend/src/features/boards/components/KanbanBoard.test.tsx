@@ -201,3 +201,38 @@ test('a shared link to a card opens it, and closing it removes the parameter', a
 function CurrentSearch() {
   return <output aria-label="Current search">{useLocation().search}</output>
 }
+
+test('the next title can be typed while the previous card is still saving', async () => {
+  const user = userEvent.setup()
+  let finishSaving: (value: unknown) => void = () => {}
+  vi.mocked(cardsApi.createCard).mockReturnValueOnce(
+    new Promise((resolve) => (finishSaving = resolve)) as never,
+  )
+  renderWithProviders(<KanbanBoard board={sampleBoard()} />)
+
+  await user.click(within(column('Done')).getByRole('button', { name: '+ Add card' }))
+  const input = within(column('Done')).getByLabelText('Title of the new card in Done')
+  await user.type(input, 'First{Enter}')
+  // The field is empty at once, while "First" is still being saved.
+  expect(input).toHaveValue('')
+  // Enter works again right away: the second card is sent while the first is still saving.
+  await user.type(input, 'Second{Enter}')
+  expect(cardsApi.createCard).toHaveBeenCalledWith('done', 'Second')
+  await user.type(input, 'Third')
+  finishSaving(fullCard())
+
+  await vi.waitFor(() => expect(cardsApi.createCard).toHaveBeenCalledWith('done', 'First'))
+  expect(input).toHaveValue('Third')
+})
+
+test('a title that could not be saved is put back in the field', async () => {
+  const user = userEvent.setup()
+  vi.mocked(cardsApi.createCard).mockRejectedValueOnce(new Error('offline'))
+  renderWithProviders(<KanbanBoard board={sampleBoard()} />)
+
+  await user.click(within(column('Done')).getByRole('button', { name: '+ Add card' }))
+  const input = within(column('Done')).getByLabelText('Title of the new card in Done')
+  await user.type(input, 'Lost title{Enter}')
+
+  await vi.waitFor(() => expect(input).toHaveValue('Lost title'))
+})

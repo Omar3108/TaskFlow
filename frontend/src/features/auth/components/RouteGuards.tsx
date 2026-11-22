@@ -18,8 +18,9 @@ export function ProtectedRoute() {
   // Wait for the session check: redirecting now would flash the login page on every reload.
   if (status === 'loading') return <SessionLoading />
   if (status === 'unauthenticated') {
-    // Remember where the user was going (an invitation link, for example) to return there.
-    const state: RedirectState = { from: location.pathname }
+    // Remember where the user was going (an invitation link, a shared card) to return there.
+    // The query string matters too: it holds the open card (?card=) and the board filters.
+    const state: RedirectState = { from: location.pathname + location.search }
     return <Navigate to="/login" replace state={state} />
   }
   return <Outlet />

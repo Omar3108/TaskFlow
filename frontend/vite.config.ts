@@ -25,6 +25,17 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
       css: false,
+      // `npm run test:coverage`. V8 measures the code as the engine runs it, with no
+      // instrumentation step. The minimums sit a little below the current values (about 82% of
+      // lines, 72% of branches), so they catch untested features rather than noise. Dragging is
+      // not measurable in jsdom; the Playwright tests in /e2e cover it.
+      coverage: {
+        provider: 'v8',
+        include: ['src/**'],
+        exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/main.tsx'],
+        reporter: ['text-summary', 'html'],
+        thresholds: { lines: 75, statements: 75, functions: 75, branches: 65 },
+      },
     },
   }
 })

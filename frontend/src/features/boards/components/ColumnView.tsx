@@ -133,6 +133,7 @@ export function ColumnView({ boardId, column, canManage, onOpenCard }: Props) {
           label={`Title of the new card in ${column.name}`}
           schema={newCardTitleSchema}
           submitLabel="Add card"
+          clearOnSubmit
           pending={createCard.isPending}
           onCancel={() => setMode('idle')}
           onSubmit={async (title) => {

@@ -1,9 +1,19 @@
 package com.taskflow.card.dto;
 
+import com.taskflow.label.dto.LabelResponse;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 /** A card as shown on the board. The description is left out to keep the board response small. */
 public record CardSummaryResponse(
-        UUID id, UUID columnId, String title, double position, AssigneeResponse assignee, LocalDate dueDate, long version) {
+        UUID id,
+        UUID columnId,
+        String title,
+        double position,
+        AssigneeResponse assignee,
+        LocalDate dueDate,
+        List<LabelResponse> labels,
+        long commentCount,
+        long version) {
 }

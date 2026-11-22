@@ -4,12 +4,14 @@ import com.taskflow.board.dto.BoardDetailResponse;
 import com.taskflow.board.dto.BoardRequest;
 import com.taskflow.board.dto.BoardResponse;
 import com.taskflow.board.dto.CreateBoardRequest;
+import com.taskflow.card.CardFilter;
 import com.taskflow.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -51,9 +53,12 @@ public class BoardController {
     }
 
     @GetMapping("/boards/{boardId}")
-    @Operation(summary = "Get a board with its columns and cards")
-    public BoardDetailResponse get(@AuthenticationPrincipal AuthenticatedUser user, @PathVariable UUID boardId) {
-        return boardService.get(boardId, user.id());
+    @Operation(summary = "Get a board with its columns and cards; optional filters return only the matching cards")
+    public BoardDetailResponse get(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @PathVariable UUID boardId,
+            @ParameterObject @Valid CardFilter filter) {
+        return boardService.get(boardId, user.id(), filter);
     }
 
     @PatchMapping("/boards/{boardId}")

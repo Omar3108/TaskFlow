@@ -9,6 +9,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -16,9 +18,12 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.OptimisticLock;
+import com.taskflow.label.Label;
 
 @Entity
 @Table(name = "cards")
@@ -59,6 +64,17 @@ public class Card {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", updatable = false)
     private User createdBy;
+
+    // Card is the owning side: Hibernate writes card_labels when this set changes. Label has no
+    // collection back, because nothing needs to navigate from a label to its cards.
+    // Changing the set is a content edit, so it bumps the version (collections take part in
+    // optimistic locking by default), and it only happens through the version-checked update.
+    @ManyToMany
+    @JoinTable(
+            name = "card_labels",
+            joinColumns = @JoinColumn(name = "card_id"),
+            inverseJoinColumns = @JoinColumn(name = "label_id"))
+    private Set<Label> labels = new HashSet<>();
 
     // Optimistic locking: Hibernate adds "AND version = ?" to every UPDATE/DELETE, increments the
     // value on each update and throws when no row matched. No setter: only Hibernate writes it.
@@ -151,6 +167,16 @@ public class Card {
 
     public User getCreatedBy() {
         return createdBy;
+    }
+
+    public Set<Label> getLabels() {
+        return labels;
+    }
+
+    /** Replaces the labels in place: Hibernate tracks the managed collection, not the field. */
+    public void setLabels(Set<Label> newLabels) {
+        labels.retainAll(newLabels);
+        labels.addAll(newLabels);
     }
 
     public long getVersion() {

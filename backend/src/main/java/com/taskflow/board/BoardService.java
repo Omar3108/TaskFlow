@@ -6,17 +6,28 @@ import com.taskflow.board.dto.BoardDetailResponse.ColumnWithCards;
 import com.taskflow.board.dto.BoardRequest;
 import com.taskflow.board.dto.BoardResponse;
 import com.taskflow.board.dto.CreateBoardRequest;
+import com.taskflow.card.Card;
+import com.taskflow.card.CardFilter;
+import com.taskflow.card.CardLabelRow;
 import com.taskflow.card.CardMapper;
+import com.taskflow.card.CardSpecifications;
+import com.taskflow.comment.CommentCount;
+import com.taskflow.comment.CommentRepository;
+import com.taskflow.label.Label;
+import com.taskflow.label.LabelMapper;
 import com.taskflow.card.CardRepository;
 import com.taskflow.card.dto.CardSummaryResponse;
 import com.taskflow.common.ordering.PositionCalculator;
 import com.taskflow.workspace.WorkspaceAccessService;
 import com.taskflow.workspace.WorkspaceMember;
 import com.taskflow.workspace.WorkspaceRole;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +44,9 @@ public class BoardService {
     private final BoardAccessService boardAccess;
     private final BoardMapper boardMapper;
     private final CardMapper cardMapper;
+    private final LabelMapper labelMapper;
+    private final CommentRepository commentRepository;
+    private final Clock clock;
 
     public BoardService(
             BoardRepository boardRepository,
@@ -41,7 +55,10 @@ public class BoardService {
             WorkspaceAccessService workspaceAccess,
             BoardAccessService boardAccess,
             BoardMapper boardMapper,
-            CardMapper cardMapper) {
+            CardMapper cardMapper,
+            LabelMapper labelMapper,
+            CommentRepository commentRepository,
+            Clock clock) {
         this.boardRepository = boardRepository;
         this.columnRepository = columnRepository;
         this.cardRepository = cardRepository;
@@ -49,6 +66,9 @@ public class BoardService {
         this.boardAccess = boardAccess;
         this.boardMapper = boardMapper;
         this.cardMapper = cardMapper;
+        this.labelMapper = labelMapper;
+        this.commentRepository = commentRepository;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -75,17 +95,37 @@ public class BoardService {
     }
 
     /**
-     * The whole board in a fixed number of queries (board, membership, columns, cards), however
-     * many columns and cards it has. Cards are grouped by column in memory.
+     * The whole board in a fixed number of queries (board, membership, columns, cards, labels,
+     * comment counts), however many columns and cards it has. Cards are grouped by column in
+     * memory. With filters, every column is still returned, but only the matching cards.
      */
     @Transactional(readOnly = true)
-    public BoardDetailResponse get(UUID boardId, UUID userId) {
+    public BoardDetailResponse get(UUID boardId, UUID userId, CardFilter filter) {
         BoardAccess access = boardAccess.requireBoard(boardId, userId, WorkspaceRole.MEMBER);
         Board board = access.board();
 
+        Map<UUID, List<Label>> labelsByCard = cardRepository.findLabelsByBoardId(boardId).stream()
+                .collect(Collectors.groupingBy(
+                        CardLabelRow::cardId, Collectors.mapping(CardLabelRow::label, Collectors.toList())));
+        Map<UUID, Long> commentCounts = commentRepository.countByBoardId(boardId).stream()
+                .collect(Collectors.toMap(CommentCount::cardId, CommentCount::count));
+
+        List<Card> cards = cardRepository.findAll(
+                CardSpecifications.forBoard(boardId, filter, LocalDate.now(clock)),
+                Sort.by("position", "id"));
+
         // groupingBy keeps the encounter order inside each group, so cards stay sorted.
-        Map<UUID, List<CardSummaryResponse>> cardsByColumn = cardRepository.findAllByBoardIdWithAssignee(boardId).stream()
-                .map(cardMapper::toSummary)
+        Map<UUID, List<CardSummaryResponse>> cardsByColumn = cards.stream()
+                .map(card -> new CardSummaryResponse(
+                        card.getId(),
+                        card.getColumn().getId(),
+                        card.getTitle(),
+                        card.getPosition(),
+                        card.getAssignee() == null ? null : cardMapper.toAssignee(card.getAssignee()),
+                        card.getDueDate(),
+                        labelMapper.toSortedResponses(labelsByCard.getOrDefault(card.getId(), List.of())),
+                        commentCounts.getOrDefault(card.getId(), 0L),
+                        card.getVersion()))
                 .collect(Collectors.groupingBy(CardSummaryResponse::columnId));
 
         List<ColumnWithCards> columns = columnRepository.findAllByBoardIdOrderByPositionAscIdAsc(boardId).stream()

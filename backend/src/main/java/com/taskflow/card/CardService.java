@@ -9,8 +9,8 @@ import com.taskflow.card.dto.MoveCardRequest;
 import com.taskflow.card.dto.UpdateCardRequest;
 import com.taskflow.common.error.BadRequestException;
 import com.taskflow.common.error.ConflictException;
-import com.taskflow.common.error.ResourceNotFoundException;
 import com.taskflow.common.ordering.PositionCalculator;
+import com.taskflow.label.LabelService;
 import com.taskflow.user.User;
 import com.taskflow.user.UserRepository;
 import com.taskflow.workspace.WorkspaceAccessService;
@@ -22,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CardService {
 
-    private static final String CARD_NOT_FOUND = "Card not found";
-
     private static final String INVALID_TARGET = "The target column must belong to the same board as the card";
     private static final String INVALID_NEIGHBOURS =
             "The neighbouring cards must be cards of the target column, in order, and not the moved card";
@@ -33,7 +31,9 @@ public class CardService {
     private final UserRepository userRepository;
     private final BoardAccessService boardAccess;
     private final WorkspaceAccessService workspaceAccess;
-    private final CardMapper mapper;
+    private final CardMapper cardMapper;
+    private final CardAccessService cardAccess;
+    private final LabelService labelService;
 
     public CardService(
             CardRepository cardRepository,
@@ -41,13 +41,17 @@ public class CardService {
             UserRepository userRepository,
             BoardAccessService boardAccess,
             WorkspaceAccessService workspaceAccess,
-            CardMapper mapper) {
+            CardMapper cardMapper,
+            CardAccessService cardAccess,
+            LabelService labelService) {
         this.cardRepository = cardRepository;
         this.boardColumnRepository = boardColumnRepository;
         this.userRepository = userRepository;
         this.boardAccess = boardAccess;
         this.workspaceAccess = workspaceAccess;
-        this.mapper = mapper;
+        this.cardMapper = cardMapper;
+        this.cardAccess = cardAccess;
+        this.labelService = labelService;
     }
 
     /** New cards go to the bottom of the column. Any member can create cards. */
@@ -63,12 +67,12 @@ public class CardService {
         card.setDueDate(request.dueDate());
         card.setAssignee(resolveAssignee(request.assigneeId(), workspaceId));
 
-        return mapper.toResponse(cardRepository.save(card));
+        return toResponse(cardRepository.save(card));
     }
 
     @Transactional(readOnly = true)
     public CardResponse get(UUID cardId, UUID userId) {
-        return mapper.toResponse(requireCard(cardId, userId));
+        return toResponse(requireCard(cardId, userId));
     }
 
     @Transactional
@@ -88,9 +92,10 @@ public class CardService {
         card.setDescription(normalize(request.description()));
         card.setDueDate(request.dueDate());
         card.setAssignee(resolveAssignee(request.assigneeId(), BoardAccessService.workspaceIdOf(card.getColumn())));
+        card.setLabels(labelService.requireLabelsOfBoard(card.getColumn().getBoard().getId(), request.labelIds()));
 
         // Flush now so @PreUpdate (and later the version increment) is reflected in the response.
-        return mapper.toResponse(cardRepository.saveAndFlush(card));
+        return toResponse(cardRepository.saveAndFlush(card));
     }
 
     @Transactional
@@ -125,7 +130,7 @@ public class CardService {
         if (card.getColumn().getId().equals(targetId)
                 && (previous == null || previous.getPosition() < card.getPosition())
                 && (next == null || card.getPosition() < next.getPosition())) {
-            return mapper.toResponse(card);
+            return toResponse(card);
         }
 
         if (previous != null && next != null) {
@@ -161,7 +166,7 @@ public class CardService {
         // different cards into the same gap both succeed with equal positions; reads order by
         // (position, id), so the result is deterministic and the next move into that gap
         // rebalances the column.
-        return mapper.toResponse(cardRepository.saveAndFlush(card));
+        return toResponse(cardRepository.saveAndFlush(card));
     }
 
     private Card resolveNeighbour(UUID neighbourId, UUID movedCardId, UUID targetColumnId) {
@@ -179,11 +184,7 @@ public class CardService {
      * operation is open to plain members, so there is no minimum-role parameter.
      */
     private Card requireCard(UUID cardId, UUID userId) {
-        Card card = cardRepository.findByIdWithBoard(cardId)
-                .orElseThrow(() -> new ResourceNotFoundException(CARD_NOT_FOUND));
-        workspaceAccess.requireRole(
-                BoardAccessService.workspaceIdOf(card.getColumn()), userId, WorkspaceRole.MEMBER, CARD_NOT_FOUND);
-        return card;
+        return cardAccess.requireCard(cardId, userId).card();
     }
 
     /** A card can only be assigned to a member of the workspace it belongs to. */
@@ -202,5 +203,9 @@ public class CardService {
 
     private static String normalize(String text) {
         return text == null || text.isBlank() ? null : text.trim();
+    }
+
+    private CardResponse toResponse(Card card) {
+        return cardMapper.toResponse(card);
     }
 }

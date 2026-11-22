@@ -51,6 +51,26 @@ public abstract class BoardTestSupport extends WorkspaceTestSupport {
                 .andExpect(status().isCreated()));
     }
 
+    protected UUID createLabel(TestUser user, UUID boardId, String name, String color) throws Exception {
+        return idOf(perform(user, post("/api/v1/boards/{id}/labels", boardId), Map.of("name", name, "color", color))
+                .andExpect(status().isCreated()));
+    }
+
+    protected UUID comment(TestUser user, UUID cardId, String body) throws Exception {
+        return idOf(perform(user, post("/api/v1/cards/{id}/comments", cardId), Map.of("body", body))
+                .andExpect(status().isCreated()));
+    }
+
+    /** Edits a card through the API with the version it currently has. */
+    protected ResultActions editCard(TestUser user, UUID cardId, Map<String, Object> fields) throws Exception {
+        long version = body(perform(user, get("/api/v1/cards/{id}", cardId)).andExpect(status().isOk()))
+                .get("version")
+                .asLong();
+        Map<String, Object> request = new LinkedHashMap<>(fields);
+        request.put("version", version);
+        return perform(user, patch("/api/v1/cards/{id}", cardId), request);
+    }
+
     protected ResultActions moveColumn(TestUser user, UUID columnId, UUID previousColumnId, UUID nextColumnId)
             throws Exception {
         return perform(

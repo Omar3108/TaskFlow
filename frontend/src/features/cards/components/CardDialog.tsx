@@ -10,7 +10,11 @@ import { TextField } from '../../../components/ui/TextField'
 import { ApiError } from '../../../lib/apiClient'
 import { errorMessage } from '../../../lib/errors'
 import { emptyToNull } from '../../../lib/forms'
-import type { Card, Member } from '../../../types/api'
+import type { Card, Label, Member, WorkspaceRole } from '../../../types/api'
+import { useAuth } from '../../auth/AuthContext'
+import { CommentSection } from '../../comments/components/CommentSection'
+import { LabelChip } from '../../labels/components/LabelChip'
+import { useLabels } from '../../labels/hooks'
 import { useMembers } from '../../workspaces/hooks'
 import { useCard, useDeleteCard, useUpdateCard } from '../hooks'
 import { cardSchema, type CardValues } from '../schemas'
@@ -19,26 +23,25 @@ interface Props {
   cardId: string
   boardId: string
   workspaceId: string
+  /** Role of the signed-in user: admins may delete other people's comments. */
+  role: WorkspaceRole
   onClose: () => void
 }
 
 /** Shows and edits one card. The board only has summaries, so the full card is loaded here. */
-export function CardDialog({ cardId, boardId, workspaceId, onClose }: Props) {
+export function CardDialog(props: Props) {
   return (
-    <Modal open onClose={onClose} title="Card details">
-      <CardDialogBody
-        cardId={cardId}
-        boardId={boardId}
-        workspaceId={workspaceId}
-        onClose={onClose}
-      />
+    <Modal open onClose={props.onClose} title="Card details" size="lg">
+      <CardDialogBody {...props} />
     </Modal>
   )
 }
 
-function CardDialogBody({ cardId, boardId, workspaceId, onClose }: Props) {
+function CardDialogBody({ cardId, boardId, workspaceId, role, onClose }: Props) {
   const card = useCard(cardId)
   const members = useMembers(workspaceId)
+  const labels = useLabels(boardId)
+  const { user } = useAuth()
 
   if (card.isPending) {
     return (
@@ -62,17 +65,22 @@ function CardDialogBody({ cardId, boardId, workspaceId, onClose }: Props) {
   }
 
   return (
-    // key: a new version (after a save or "load latest") remounts the form with fresh values.
-    <CardForm
-      key={card.data.version}
-      card={card.data}
-      members={members.data ?? []}
-      membersLoading={members.isPending}
-      boardId={boardId}
-      onClose={onClose}
-      onReload={() => void card.refetch()}
-      reloading={card.isFetching}
-    />
+    <div className="flex flex-col gap-6">
+      {/* key: a new version (after a save or "load latest") remounts the form with fresh values. */}
+      <CardForm
+        key={card.data.version}
+        card={card.data}
+        members={members.data ?? []}
+        membersLoading={members.isPending}
+        boardLabels={labels.data ?? []}
+        boardId={boardId}
+        onClose={onClose}
+        onReload={() => void card.refetch()}
+        reloading={card.isFetching}
+      />
+      {/* Outside the card form: comments are saved on their own, not with "Save". */}
+      <CommentSection cardId={cardId} boardId={boardId} currentUserId={user?.id} role={role} />
+    </div>
   )
 }
 
@@ -80,6 +88,7 @@ interface FormProps {
   card: Card
   members: Member[]
   membersLoading: boolean
+  boardLabels: Label[]
   boardId: string
   onClose: () => void
   onReload: () => void
@@ -90,6 +99,7 @@ function CardForm({
   card,
   members,
   membersLoading,
+  boardLabels,
   boardId,
   onClose,
   onReload,
@@ -109,6 +119,7 @@ function CardForm({
       description: card.description ?? '',
       assigneeId: card.assignee?.id ?? '',
       dueDate: card.dueDate ?? '',
+      labelIds: card.labels.map((label) => label.id),
     },
   })
 
@@ -119,6 +130,7 @@ function CardForm({
         description: emptyToNull(values.description),
         assigneeId: values.assigneeId || null,
         dueDate: values.dueDate || null,
+        labelIds: values.labelIds,
         // The version this form was filled from: if somebody saved since, the server says 409.
         version: card.version,
       },
@@ -170,7 +182,28 @@ function CardForm({
         <TextField label="Due date" type="date" {...register('dueDate')} />
       </div>
 
-      {confirmingDelete ? (
+      <fieldset>
+        <legend className="mb-1 text-sm font-medium text-slate-700">Labels</legend>
+        {boardLabels.length === 0 ? (
+          <p className="text-sm text-slate-500">This board has no labels yet.</p>
+        ) : (
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {boardLabels.map((label) => (
+              <label key={label.id} className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  value={label.id}
+                  className="size-4 rounded border-slate-300"
+                  {...register('labelIds')}
+                />
+                <LabelChip label={label} />
+              </label>
+            ))}
+          </div>
+        )}
+      </fieldset>
+
+      {confirmingDelete && (
         <div className="flex flex-col gap-2 rounded-md border border-red-200 bg-red-50 p-3">
           <p className="text-sm text-red-800">Delete this card? This cannot be undone.</p>
           {deleteCard.isError && <Alert>{errorMessage(deleteCard.error)}</Alert>}
@@ -188,7 +221,7 @@ function CardForm({
             </Button>
           </div>
         </div>
-      ) : null}
+      )}
 
       <div className="flex items-center justify-between gap-2">
         <Button

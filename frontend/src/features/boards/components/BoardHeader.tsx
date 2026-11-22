@@ -6,6 +6,7 @@ import { errorMessage } from '../../../lib/errors'
 import type { BoardDetail } from '../../../types/api'
 import { useDeleteBoard } from '../hooks'
 import { canManageBoards } from '../permissions'
+import { LabelManagerDialog } from '../../labels/components/LabelManagerDialog'
 import { BoardFormDialog } from './BoardFormDialog'
 
 export function BoardHeader({ board }: { board: BoardDetail }) {
@@ -13,6 +14,7 @@ export function BoardHeader({ board }: { board: BoardDetail }) {
   const deleteBoard = useDeleteBoard(board)
   const [editing, setEditing] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [managingLabels, setManagingLabels] = useState(false)
   const canManage = canManageBoards(board.role)
 
   return (
@@ -32,6 +34,9 @@ export function BoardHeader({ board }: { board: BoardDetail }) {
         </div>
         {canManage && (
           <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setManagingLabels(true)}>
+              Labels
+            </Button>
             <Button variant="secondary" onClick={() => setEditing(true)}>
               Edit board
             </Button>
@@ -42,6 +47,11 @@ export function BoardHeader({ board }: { board: BoardDetail }) {
         )}
       </div>
 
+      <LabelManagerDialog
+        boardId={board.id}
+        open={managingLabels}
+        onClose={() => setManagingLabels(false)}
+      />
       <BoardFormDialog
         mode={{ kind: 'edit', board }}
         open={editing}

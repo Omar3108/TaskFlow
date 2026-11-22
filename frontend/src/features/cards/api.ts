@@ -14,6 +14,8 @@ export interface UpdateCardInput {
   description: string | null
   assigneeId: string | null
   dueDate: string | null
+  /** Labels of the card's board; the ones left out are removed. */
+  labelIds: string[]
   /** The version that was read; the server answers 409 if somebody saved in between. */
   version: number
 }

@@ -1,8 +1,16 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type QueryKey,
+} from '@tanstack/react-query'
 import { queryKeys } from '../../lib/queryKeys'
 import type { BoardDetail } from '../../types/api'
 import * as api from './api'
 import { applyColumnMove, type ColumnMove } from './dnd'
+import type { BoardFilters } from './filters'
 
 export function useBoards(workspaceId: string) {
   return useQuery({
@@ -11,10 +19,13 @@ export function useBoards(workspaceId: string) {
   })
 }
 
-export function useBoard(boardId: string) {
+export function useBoard(boardId: string, filters: BoardFilters = {}) {
   return useQuery({
-    queryKey: queryKeys.boards.detail(boardId),
-    queryFn: () => api.getBoard(boardId),
+    // Each filter combination is its own cache entry, under the board's common prefix.
+    queryKey: queryKeys.boards.filtered(boardId, filters),
+    queryFn: () => api.getBoard(boardId, filters),
+    // While a new filter loads, keep showing the previous result instead of a loading screen.
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -34,7 +45,7 @@ export function useUpdateBoard(board: { id: string; workspaceId: string }) {
       api.updateBoard(board.id, input),
     onSuccess: () =>
       Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.boards.detail(board.id) }),
+        invalidateBoard(queryClient, board.id),
         queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.boards(board.workspaceId) }),
       ]),
   })
@@ -45,8 +56,8 @@ export function useDeleteBoard(board: { id: string; workspaceId: string }) {
   return useMutation({
     mutationFn: () => api.deleteBoard(board.id),
     onSuccess: () => {
-      // Remove (not refetch) the deleted board: refetching would only produce a 404.
-      queryClient.removeQueries({ queryKey: queryKeys.boards.detail(board.id) })
+      // Remove (not refetch) everything about the deleted board: refetching would only 404.
+      queryClient.removeQueries({ queryKey: queryKeys.boards.root(board.id) })
       return queryClient.invalidateQueries({
         queryKey: queryKeys.workspaces.boards(board.workspaceId),
       })
@@ -54,14 +65,15 @@ export function useDeleteBoard(board: { id: string; workspaceId: string }) {
   })
 }
 
-/** Every column or card change ends by refetching the board, the single source of truth. */
+/** Every column or card change ends by refetching the board (all its filter variants). */
 export function invalidateBoard(queryClient: QueryClient, boardId: string) {
   return queryClient.invalidateQueries({ queryKey: queryKeys.boards.detail(boardId) })
 }
 
 /**
  * Optimistic update of the board in the cache: the screen changes at once, and is rolled back
- * if the server rejects the change. Used by the drag-and-drop moves.
+ * if the server rejects the change. Used by the drag-and-drop moves. It updates every cached
+ * filter variant of the board, so switching filters right after a move shows no stale order.
  */
 export function optimisticBoardUpdate<TVariables>(
   queryClient: QueryClient,
@@ -73,12 +85,18 @@ export function optimisticBoardUpdate<TVariables>(
     onMutate: async (variables: TVariables) => {
       // Cancel refetches in flight first: one that lands later would overwrite the change.
       await queryClient.cancelQueries({ queryKey })
-      const previous = queryClient.getQueryData<BoardDetail>(queryKey)
-      if (previous) queryClient.setQueryData(queryKey, apply(previous, variables))
+      const previous = queryClient.getQueriesData<BoardDetail>({ queryKey })
+      queryClient.setQueriesData<BoardDetail>({ queryKey }, (board) =>
+        board ? apply(board, variables) : board,
+      )
       return { previous }
     },
-    onError: (_error: Error, _variables: TVariables, context?: { previous?: BoardDetail }) => {
-      if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
+    onError: (
+      _error: Error,
+      _variables: TVariables,
+      context?: { previous?: [QueryKey, BoardDetail | undefined][] },
+    ) => {
+      context?.previous?.forEach(([key, board]) => queryClient.setQueryData(key, board))
     },
     // Success or failure, end with the real state (and real positions) from the server.
     onSettled: () => invalidateBoard(queryClient, boardId),

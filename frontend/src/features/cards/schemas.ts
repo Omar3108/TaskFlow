@@ -16,6 +16,7 @@ export const cardSchema = z.object({
   description: z.string().max(5000, 'Description must be at most 5000 characters'),
   assigneeId: z.string(),
   dueDate: z.string(),
+  labelIds: z.array(z.string()),
 })
 
 export type NewCardValues = z.infer<typeof newCardSchema>

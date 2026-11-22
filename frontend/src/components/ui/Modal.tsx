@@ -5,6 +5,7 @@ interface ModalProps {
   onClose: () => void
   title: string
   children: ReactNode
+  size?: 'md' | 'lg'
 }
 
 /**
@@ -12,7 +13,7 @@ interface ModalProps {
  * modal has to reimplement: focus trapped inside, Escape to close, the rest of the page inert
  * and a backdrop.
  */
-export function Modal({ open, onClose, title, children }: ModalProps) {
+export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const titleId = useId()
 
@@ -29,7 +30,7 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
       // Fired when the dialog closes for any reason, including the Escape key.
       onClose={onClose}
       aria-labelledby={titleId}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl bg-white p-0 shadow-xl backdrop:bg-slate-900/40"
+      className={`m-auto w-[calc(100%-2rem)] ${size === 'lg' ? 'max-w-2xl' : 'max-w-md'} rounded-xl bg-white p-0 shadow-xl backdrop:bg-slate-900/40`}
     >
       {/* Mounted only while open, so forms inside start empty every time. */}
       {open && (

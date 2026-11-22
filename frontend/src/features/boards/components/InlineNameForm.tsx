@@ -84,7 +84,9 @@ export function InlineNameForm({
       />
       {errors.name && <p className="text-xs text-red-600">{errors.name.message}</p>}
       <div className="flex gap-2">
-        <Button type="submit" size="sm" loading={pending}>
+        {/* Not disabled while adding: a disabled submit button also blocks submitting with
+            Enter, and adding several items in a row is the point of clearOnSubmit. */}
+        <Button type="submit" size="sm" loading={pending && !clearOnSubmit}>
           {submitLabel}
         </Button>
         <Button size="sm" variant="secondary" onClick={onCancel}>

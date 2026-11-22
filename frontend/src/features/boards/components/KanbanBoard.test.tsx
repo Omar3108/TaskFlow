@@ -215,11 +215,14 @@ test('the next title can be typed while the previous card is still saving', asyn
   await user.type(input, 'First{Enter}')
   // The field is empty at once, while "First" is still being saved.
   expect(input).toHaveValue('')
-  await user.type(input, 'Second')
+  // Enter works again right away: the second card is sent while the first is still saving.
+  await user.type(input, 'Second{Enter}')
+  expect(cardsApi.createCard).toHaveBeenCalledWith('done', 'Second')
+  await user.type(input, 'Third')
   finishSaving(fullCard())
 
   await vi.waitFor(() => expect(cardsApi.createCard).toHaveBeenCalledWith('done', 'First'))
-  expect(input).toHaveValue('Second')
+  expect(input).toHaveValue('Third')
 })
 
 test('a title that could not be saved is put back in the field', async () => {

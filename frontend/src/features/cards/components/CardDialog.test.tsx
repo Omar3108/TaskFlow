@@ -249,3 +249,21 @@ test('older comments are loaded on demand', async () => {
     within(comments()).queryByRole('button', { name: 'Show older comments' }),
   ).not.toBeInTheDocument()
 })
+
+test('a board with a single label can label the card (one checkbox still sends a list)', async () => {
+  const user = userEvent.setup()
+  vi.mocked(api.getCard).mockResolvedValue(fullCard({ labels: [] }))
+  vi.mocked(labelsApi.listLabels).mockResolvedValue([BUG])
+  vi.mocked(api.updateCard).mockResolvedValue(fullCard({ labels: [BUG], version: 2 }))
+  renderDialog()
+
+  await user.click(await screen.findByRole('checkbox', { name: 'Bug' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+
+  await vi.waitFor(() =>
+    expect(api.updateCard).toHaveBeenCalledWith(
+      'a',
+      expect.objectContaining({ labelIds: ['l-bug'] }),
+    ),
+  )
+})

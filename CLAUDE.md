@@ -54,8 +54,8 @@ pull requests and checks that nothing is broken.
 - **Frontend:** React 19 + TypeScript + Vite, React Router, TanStack Query, React Hook Form +
   Zod, Tailwind CSS 4, dnd-kit, sonner (toasts), ESLint + Prettier. Tests: Vitest + React Testing Library,
   Playwright (2–3 E2E flows).
-- **Infra:** multi-stage Dockerfiles, `docker-compose.yml`, GitHub Actions, backend + PostgreSQL
-  on Render/Railway, frontend on Vercel.
+- **Infra:** multi-stage Dockerfiles, `docker-compose.yml`, GitHub Actions, backend on Render,
+  PostgreSQL on Neon (Render's free database expires after 30 days), frontend on Vercel.
 
 Environment notes:
 
@@ -198,11 +198,28 @@ Environment notes:
   callbacks are dropped when the component remounts, so use `mutateAsync` when a mutation can
   remount its own form; and an inline "add" form must clear itself on submit, not when the
   request finishes, and keep its submit button enabled so Enter works.
+- **Deployment (phase 7):** Vercel serves the frontend and rewrites `/api/*` to Render
+  (`frontend/vercel.json`, which also sets CSP and security headers and disables preview
+  deployments); Render runs `backend/Dockerfile`; Neon hosts PostgreSQL (direct connection,
+  `sslmode=require`, `DB_POOL_SIZE` 5). The nginx image sends the same headers
+  (`frontend/security-headers.conf`, included in every `location` because nginx drops inherited
+  `add_header` in a location that declares its own), so E2E runs under the production CSP.
+  `server.forward-headers-strategy: framework`. CD: the `deploy` job (main only, after all test
+  jobs) calls the Render deploy hook (secret `RENDER_DEPLOY_HOOK_URL`) and waits until
+  `/actuator/info` (`info.app.commit` from `RENDER_GIT_COMMIT`) reports the pushed commit
+  (variable `API_URL`); Render auto-deploy is off. Step-by-step guide: `docs/deployment.md`.
+- **Demo sandboxes:** `POST /api/v1/auth/demo` (package `demo`) creates a private account
+  (`users.demo_expires_at`, random unknown password, e-mail `demo-<uuid>@demo.taskflow.dev`), a
+  teammate, and a pre-filled workspace through the regular services, then signs it in like a
+  login. Expired sandboxes are deleted (owned workspaces first, then users) hourly and before
+  each new sandbox. Limits: `DEMO_MAX_PER_IP_PER_HOUR` (in-memory sliding window, single
+  instance) and `DEMO_MAX_ACTIVE`; 429 when exceeded. The frontend's `trackSlow` counts requests
+  slower than 4 s and `SlowServerNotice` explains the free-tier cold start.
 - **Resource 404s:** a non-member gets the same 404 body as for a missing id ("Board not
   found", "Column not found", "Card not found"), via `WorkspaceAccessService.requireRole(...,
   notFoundMessage)`.
 - **Code layout:** package-by-feature in the backend (`auth`, `user`, `workspace`, `board`,
-  `card`, `label`, `comment`, `security`, `common`); feature folders in the frontend (`src/app`, `src/features/*`,
+  `card`, `label`, `comment`, `demo`, `security`, `common`); feature folders in the frontend (`src/app`, `src/features/*`,
   `src/pages`, `src/components/ui`, `src/lib`, `src/types`, `src/test`).
 
 ## Commands
@@ -243,7 +260,7 @@ live in `src/test/fixtures.ts`.
 | 4 | Labels, comments, search and filters | Done — pending merge |
 | 5 | Frontend polish | Done — pending merge |
 | 6 | Testing (70%+ backend coverage, component tests, Playwright) | Done — pending merge |
-| 7 | Docker, CI/CD and deployment, demo user | Not started |
+| 7 | Docker, CI/CD and deployment, demo user | In progress — 7a code and config done; 7b deploy with Omar pending |
 | 8 | Extras: WebSockets, notifications, activity history, dashboard, attachments, dark mode | Not started |
 | 9 | README in English | Not started |
 

@@ -43,7 +43,8 @@ public class SecurityConfig {
                         // CORS preflight requests carry no credentials.
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
+                        // info carries the deployed commit, which the deploy job waits for.
+                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/swagger-ui", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         // Secure by default: any route added later needs authentication.
                         .anyRequest().authenticated())

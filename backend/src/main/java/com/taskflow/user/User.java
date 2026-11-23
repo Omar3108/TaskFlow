@@ -31,6 +31,10 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** Set only on demo sandbox accounts: when the account and its data are deleted. */
+    @Column(name = "demo_expires_at", updatable = false)
+    private Instant demoExpiresAt;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -42,6 +46,13 @@ public class User {
         this.email = email;
         this.passwordHash = passwordHash;
         this.displayName = displayName;
+    }
+
+    /** A temporary account for the demo, deleted (with everything it owns) at {@code expiresAt}. */
+    public static User demo(String email, String passwordHash, String displayName, Instant expiresAt) {
+        User user = new User(email, passwordHash, displayName);
+        user.demoExpiresAt = expiresAt;
+        return user;
     }
 
     // JPA lifecycle callbacks run as soon as the entity is persisted, so the timestamps are
@@ -84,5 +95,9 @@ public class User {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public Instant getDemoExpiresAt() {
+        return demoExpiresAt;
     }
 }

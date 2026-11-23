@@ -18,6 +18,11 @@ export function register(payload: RegisterPayload) {
   return apiFetch<AuthResponse>('/auth/register', { method: 'POST', body: payload, auth: false })
 }
 
+/** Creates a private, pre-filled sandbox and signs in to it. */
+export function startDemo() {
+  return apiFetch<AuthResponse>('/auth/demo', { method: 'POST', auth: false })
+}
+
 export function logout() {
   return apiFetch<void>('/auth/logout', { method: 'POST', auth: false })
 }

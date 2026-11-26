@@ -49,16 +49,16 @@ openssl rand -base64 32
 1. At <https://render.com>: **New → Web Service**, connect the GitHub repository.
 2. Settings:
 
-   | Setting            | Value                                                      |
-   | ------------------ | ---------------------------------------------------------- |
-   | Name               | `taskflow-api` (gives `https://taskflow-api.onrender.com`) |
-   | Region             | the one chosen above                                       |
-   | Branch             | `main`                                                     |
-   | Root directory     | `backend`                                                  |
-   | Runtime / language | Docker (it finds `backend/Dockerfile`)                     |
-   | Instance type      | Free                                                       |
-   | Health check path  | `/actuator/health`                                         |
-   | Auto-Deploy        | **Off**: GitHub Actions deploys after the tests pass       |
+   | Setting            | Value                                                                                                                     |
+   | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+   | Name               | `taskflow-api` (Render adds a suffix when the name is taken: this deployment is `https://taskflow-api-v7hz.onrender.com`) |
+   | Region             | the one chosen above                                                                                                      |
+   | Branch             | `main`                                                                                                                    |
+   | Root directory     | `backend`                                                                                                                 |
+   | Runtime / language | Docker (it finds `backend/Dockerfile`)                                                                                    |
+   | Instance type      | Free                                                                                                                      |
+   | Health check path  | `/actuator/health`                                                                                                        |
+   | Auto-Deploy        | **Off**: GitHub Actions deploys after the tests pass                                                                      |
 
 3. Environment variables:
 
@@ -76,7 +76,7 @@ openssl rand -base64 32
 
    Leave `PORT` unset (Render provides it) and `COOKIE_SECURE` unset (secure is the default).
 
-4. Create the service and wait for the first deploy. `https://taskflow-api.onrender.com/actuator/health`
+4. Create the service and wait for the first deploy. `https://taskflow-api-v7hz.onrender.com/actuator/health`
    must answer `{"status":"UP"}`.
 5. **Settings → Deploy Hook**: copy the URL. It is a secret: anyone with it can trigger deploys.
 
@@ -87,10 +87,10 @@ If Render gives the service a different URL, use that URL everywhere below and i
 
 In the repository: **Settings → Secrets and variables → Actions**.
 
-| Kind     | Name                     | Value                               |
-| -------- | ------------------------ | ----------------------------------- |
-| Secret   | `RENDER_DEPLOY_HOOK_URL` | the deploy hook from step 3.5       |
-| Variable | `API_URL`                | `https://taskflow-api.onrender.com` |
+| Kind     | Name                     | Value                                    |
+| -------- | ------------------------ | ---------------------------------------- |
+| Secret   | `RENDER_DEPLOY_HOOK_URL` | the deploy hook from step 3.5            |
+| Variable | `API_URL`                | `https://taskflow-api-v7hz.onrender.com` |
 
 From then on every push to `main` runs the tests and, if they all pass, the `deploy` job calls the
 hook and waits until `/actuator/info` reports the pushed commit. Without these values the job
@@ -114,7 +114,7 @@ cache policy for hashed assets, and turns off preview deployments: only `main` i
 
 - Open the Vercel URL and click **Try the demo**.
 - Register an account, create a board, reload: the session survives (refresh cookie).
-- `https://taskflow-api.onrender.com/actuator/info` shows the deployed commit.
+- `https://taskflow-api-v7hz.onrender.com/actuator/info` shows the deployed commit.
 
 ## Troubleshooting
 

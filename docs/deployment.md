@@ -49,29 +49,34 @@ openssl rand -base64 32
 1. At <https://render.com>: **New → Web Service**, connect the GitHub repository.
 2. Settings:
 
-   | Setting            | Value                                                      |
-   | ------------------ | ---------------------------------------------------------- |
-   | Name               | `taskflow-api` (gives `https://taskflow-api.onrender.com`) |
-   | Region             | the one chosen above                                       |
-   | Branch             | `main`                                                     |
-   | Root directory     | `backend`                                                  |
-   | Runtime / language | Docker (it finds `backend/Dockerfile`)                     |
-   | Instance type      | Free                                                       |
-   | Health check path  | `/actuator/health`                                         |
-   | Auto-Deploy        | **Off**: GitHub Actions deploys after the tests pass       |
+   | Setting            | Value                                                                                                                     |
+   | ------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+   | Name               | `taskflow-api` (Render adds a suffix when the name is taken: this deployment is `https://taskflow-api-v7hz.onrender.com`) |
+   | Region             | the one chosen above                                                                                                      |
+   | Branch             | `main`                                                                                                                    |
+   | Root directory     | `backend`                                                                                                                 |
+   | Runtime / language | Docker (it finds `backend/Dockerfile`)                                                                                    |
+   | Instance type      | Free                                                                                                                      |
+   | Health check path  | `/actuator/health`                                                                                                        |
+   | Auto-Deploy        | **Off**: GitHub Actions deploys after the tests pass                                                                      |
 
 3. Environment variables:
 
-   | Variable                               | Value                                                  |
-   | -------------------------------------- | ------------------------------------------------------ |
-   | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | from step 1                                            |
-   | `JWT_SECRET`                           | from step 2                                            |
-   | `CORS_ALLOWED_ORIGINS`                 | `https://<your-app>.vercel.app` (fill in after step 5) |
-   | `DEMO_ENABLED`                         | `true`                                                 |
+   | Variable                               | Value                                                |
+   | -------------------------------------- | ---------------------------------------------------- |
+   | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | from step 1                                          |
+   | `JWT_SECRET`                           | from step 2                                          |
+   | `CORS_ALLOWED_ORIGINS`                 | `https://<your-app>.vercel.app` (see the note below) |
+   | `DEMO_ENABLED`                         | `true`                                               |
+
+   The Vercel URL only exists after step 5. Until then put the URL you expect (the project
+   name: `https://taskflow.vercel.app`) and correct it in step 5. **Never leave it empty**: an
+   empty value is an empty list, and the API refuses to start ("app.cors.allowedOrigins must not
+   be empty").
 
    Leave `PORT` unset (Render provides it) and `COOKIE_SECURE` unset (secure is the default).
 
-4. Create the service and wait for the first deploy. `https://taskflow-api.onrender.com/actuator/health`
+4. Create the service and wait for the first deploy. `https://taskflow-api-v7hz.onrender.com/actuator/health`
    must answer `{"status":"UP"}`.
 5. **Settings → Deploy Hook**: copy the URL. It is a secret: anyone with it can trigger deploys.
 
@@ -82,10 +87,10 @@ If Render gives the service a different URL, use that URL everywhere below and i
 
 In the repository: **Settings → Secrets and variables → Actions**.
 
-| Kind     | Name                     | Value                               |
-| -------- | ------------------------ | ----------------------------------- |
-| Secret   | `RENDER_DEPLOY_HOOK_URL` | the deploy hook from step 3.5       |
-| Variable | `API_URL`                | `https://taskflow-api.onrender.com` |
+| Kind     | Name                     | Value                                    |
+| -------- | ------------------------ | ---------------------------------------- |
+| Secret   | `RENDER_DEPLOY_HOOK_URL` | the deploy hook from step 3.5            |
+| Variable | `API_URL`                | `https://taskflow-api-v7hz.onrender.com` |
 
 From then on every push to `main` runs the tests and, if they all pass, the `deploy` job calls the
 hook and waits until `/actuator/info` reports the pushed commit. Without these values the job
@@ -109,14 +114,14 @@ cache policy for hashed assets, and turns off preview deployments: only `main` i
 
 - Open the Vercel URL and click **Try the demo**.
 - Register an account, create a board, reload: the session survives (refresh cookie).
-- `https://taskflow-api.onrender.com/actuator/info` shows the deployed commit.
+- `https://taskflow-api-v7hz.onrender.com/actuator/info` shows the deployed commit.
 
 ## Troubleshooting
 
-| Symptom                       | Likely cause                                                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| First request takes ~1 minute | The free API was asleep. Expected.                                                                                  |
-| `403` on login or register    | `CORS_ALLOWED_ORIGINS` does not contain the exact Vercel URL (scheme, no trailing slash).                           |
-| Signed out after every reload | The API is not reached through the Vercel rewrite (cookie not first-party), or `COOKIE_SECURE=false` in production. |
-| API fails to start            | Check the Render logs: usually a wrong `DB_URL` (it must start with `jdbc:`) or a missing `JWT_SECRET`.             |
-| `deploy` job times out        | The Render build failed (see its logs), or the service is not on `main`.                                            |
+| Symptom                       | Likely cause                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| First request takes ~1 minute | The free API was asleep. Expected.                                                                                             |
+| `403` on login or register    | `CORS_ALLOWED_ORIGINS` does not contain the exact Vercel URL (scheme, no trailing slash).                                      |
+| Signed out after every reload | The API is not reached through the Vercel rewrite (cookie not first-party), or `COOKIE_SECURE=false` in production.            |
+| API fails to start            | Check the Render logs: a wrong `DB_URL` (must start with `jdbc:`), a missing `JWT_SECRET`, or an empty `CORS_ALLOWED_ORIGINS`. |
+| `deploy` job times out        | The Render build failed (see its logs), or the service is not on `main`.                                                       |

@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://taskflow-api.onrender.com/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://taskflow-api-v7hz.onrender.com/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

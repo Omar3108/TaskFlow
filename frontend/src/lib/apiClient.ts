@@ -1,4 +1,5 @@
 import type { AuthResponse, ProblemDetail } from '../types/api'
+import { trackSlow } from './slowRequests'
 
 /**
  * Relative on purpose: in development Vite proxies /api to the backend, and in production the
@@ -82,7 +83,8 @@ export function refreshSession(): Promise<AuthResponse | null> {
 
 async function doRefresh(): Promise<AuthResponse | null> {
   try {
-    const response = await fetch(`${API_BASE}/auth/refresh`, { method: 'POST' })
+    // The first request of a visit: the one most likely to meet a sleeping server.
+    const response = await trackSlow(fetch(`${API_BASE}/auth/refresh`, { method: 'POST' }))
     if (!response.ok) {
       accessToken = null
       return null
@@ -101,11 +103,13 @@ function send(path: string, options: RequestOptions, token: string | null) {
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
 
-  return fetch(`${API_BASE}${path}`, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  })
+  return trackSlow(
+    fetch(`${API_BASE}${path}`, {
+      method: options.method ?? 'GET',
+      headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    }),
+  )
 }
 
 async function toApiError(response: Response) {

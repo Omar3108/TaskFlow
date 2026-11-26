@@ -130,3 +130,34 @@ jobs:
       - name: Stop the app
         if: always()
         run: docker compose --profile app down
+
+  deploy:
+    name: Deploy backend (Render)
+    runs-on: ubuntu-latest
+    # Continuous deployment: only main, and only when every test job passed. Render's own
+    # auto-deploy is off, so nothing reaches production without going through CI first.
+    needs: [backend, frontend, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Trigger the deploy and wait for the new version
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ] || [ -z "$API_URL" ]; then
+            echo "::notice::Deployment is not configured (secret RENDER_DEPLOY_HOOK_URL, variable API_URL). Skipping."
+            exit 0
+          fi
+          curl -fsS -X POST "$DEPLOY_HOOK" > /dev/null
+          # Health alone would pass on the old version; wait until /actuator/info reports this commit.
+          for attempt in $(seq 1 60); do
+            commit=$(curl -fsS "$API_URL/actuator/info" | jq -r '.app.commit // empty' || true)
+            if [ "$commit" = "$GITHUB_SHA" ]; then
+              echo "Version $commit is live."
+              curl -fsS "$API_URL/actuator/health"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Commit $GITHUB_SHA was not live after 10 minutes (still serving: ${commit:-unknown})."
+          exit 1

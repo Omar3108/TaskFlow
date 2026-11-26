@@ -35,6 +35,7 @@ const rows: Row[] = [
     { method: 'POST', body: { email: 'a@b.c', password: 'pw', displayName: 'A' }, auth: false },
   ],
   ['logout', () => authApi.logout(), '/auth/logout', { method: 'POST', auth: false }],
+  ['start demo', () => authApi.startDemo(), '/auth/demo', { method: 'POST', auth: false }],
   ['current user', () => authApi.fetchCurrentUser(), '/users/me'],
   [
     'update profile',

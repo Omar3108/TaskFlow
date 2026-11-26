@@ -22,6 +22,7 @@ export function renderWithProviders(ui: ReactElement, { auth = {}, route = '/' }
     user: null,
     login: vi.fn(),
     register: vi.fn(),
+    startDemo: vi.fn(),
     logout: vi.fn(),
     updateUser: vi.fn(),
     ...auth,

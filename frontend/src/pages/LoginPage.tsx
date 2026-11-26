@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router'
 import { LoginForm } from '../features/auth/components/LoginForm'
+import { TryDemo } from '../features/auth/components/TryDemo'
 import { AuthLayout } from './AuthLayout'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 
@@ -26,6 +27,9 @@ export function LoginPage() {
     >
       {/* No navigation here: once the session exists, PublicOnlyRoute redirects. */}
       <LoginForm />
+      <div className="mt-6">
+        <TryDemo />
+      </div>
     </AuthLayout>
   )
 }

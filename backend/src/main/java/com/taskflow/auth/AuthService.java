@@ -71,6 +71,12 @@ public class AuthService {
         return createSession(user, refreshTokenService.issue(user));
     }
 
+    /** Signs in a user created by the server itself (the demo sandbox). */
+    @Transactional
+    public AuthResult startSession(User user) {
+        return createSession(user, refreshTokenService.issue(user));
+    }
+
     // noRollbackFor: the reuse-detection revocation done inside rotate() must be committed
     // even though the exception propagates through this transaction.
     @Transactional(noRollbackFor = InvalidRefreshTokenException.class)

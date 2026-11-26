@@ -10,6 +10,8 @@ export interface AuthContextValue {
   user: User | null
   login: (payload: LoginPayload) => Promise<void>
   register: (payload: RegisterPayload) => Promise<void>
+  /** Signs in to a new demo sandbox. */
+  startDemo: () => Promise<void>
   logout: () => Promise<void>
   /** Replaces the signed-in user's data after a profile change. */
   updateUser: (user: User) => void

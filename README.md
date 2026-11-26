@@ -43,6 +43,11 @@ Open http://localhost:3000 (change it with `WEB_PORT` in `.env`). nginx serves t
 forwards `/api` to the API container, which is not published on the host.
 `docker compose --profile app down` stops it; the database volume is kept.
 
+## Deployment
+
+Frontend on Vercel, API on Render, PostgreSQL on Neon, deployed from GitHub Actions after the
+tests pass. Step by step: [`docs/deployment.md`](docs/deployment.md).
+
 ## Tests
 
 ```bash

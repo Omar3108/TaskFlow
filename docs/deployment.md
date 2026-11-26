@@ -62,12 +62,17 @@ openssl rand -base64 32
 
 3. Environment variables:
 
-   | Variable                               | Value                                                  |
-   | -------------------------------------- | ------------------------------------------------------ |
-   | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | from step 1                                            |
-   | `JWT_SECRET`                           | from step 2                                            |
-   | `CORS_ALLOWED_ORIGINS`                 | `https://<your-app>.vercel.app` (fill in after step 5) |
-   | `DEMO_ENABLED`                         | `true`                                                 |
+   | Variable                               | Value                                                |
+   | -------------------------------------- | ---------------------------------------------------- |
+   | `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | from step 1                                          |
+   | `JWT_SECRET`                           | from step 2                                          |
+   | `CORS_ALLOWED_ORIGINS`                 | `https://<your-app>.vercel.app` (see the note below) |
+   | `DEMO_ENABLED`                         | `true`                                               |
+
+   The Vercel URL only exists after step 5. Until then put the URL you expect (the project
+   name: `https://taskflow.vercel.app`) and correct it in step 5. **Never leave it empty**: an
+   empty value is an empty list, and the API refuses to start ("app.cors.allowedOrigins must not
+   be empty").
 
    Leave `PORT` unset (Render provides it) and `COOKIE_SECURE` unset (secure is the default).
 
@@ -113,10 +118,10 @@ cache policy for hashed assets, and turns off preview deployments: only `main` i
 
 ## Troubleshooting
 
-| Symptom                       | Likely cause                                                                                                        |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| First request takes ~1 minute | The free API was asleep. Expected.                                                                                  |
-| `403` on login or register    | `CORS_ALLOWED_ORIGINS` does not contain the exact Vercel URL (scheme, no trailing slash).                           |
-| Signed out after every reload | The API is not reached through the Vercel rewrite (cookie not first-party), or `COOKIE_SECURE=false` in production. |
-| API fails to start            | Check the Render logs: usually a wrong `DB_URL` (it must start with `jdbc:`) or a missing `JWT_SECRET`.             |
-| `deploy` job times out        | The Render build failed (see its logs), or the service is not on `main`.                                            |
+| Symptom                       | Likely cause                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| First request takes ~1 minute | The free API was asleep. Expected.                                                                                             |
+| `403` on login or register    | `CORS_ALLOWED_ORIGINS` does not contain the exact Vercel URL (scheme, no trailing slash).                                      |
+| Signed out after every reload | The API is not reached through the Vercel rewrite (cookie not first-party), or `COOKIE_SECURE=false` in production.            |
+| API fails to start            | Check the Render logs: a wrong `DB_URL` (must start with `jdbc:`), a missing `JWT_SECRET`, or an empty `CORS_ALLOWED_ORIGINS`. |
+| `deploy` job times out        | The Render build failed (see its logs), or the service is not on `main`.                                                       |

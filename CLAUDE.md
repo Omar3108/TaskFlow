@@ -257,10 +257,10 @@ live in `src/test/fixtures.ts`.
 | 1 | Authentication (security code written by Claude at Omar's request) | Done |
 | 2 | Workspaces and members | Done |
 | 3 | Boards, columns and cards (move logic + optimistic locking by a subagent) | Done |
-| 4 | Labels, comments, search and filters | Done — pending merge |
-| 5 | Frontend polish | Done — pending merge |
-| 6 | Testing (70%+ backend coverage, component tests, Playwright) | Done — pending merge |
-| 7 | Docker, CI/CD and deployment, demo user | In progress — 7a code and config done; 7b deploy with Omar pending |
+| 4 | Labels, comments, search and filters | Done |
+| 5 | Frontend polish | Done |
+| 6 | Testing (70%+ backend coverage, component tests, Playwright) | Done |
+| 7 | Docker, CI/CD and deployment, demo user | Done — live at https://task-flow-cyan-xi.vercel.app (API https://taskflow-api-v7hz.onrender.com) |
 | 8 | Extras: WebSockets, notifications, activity history, dashboard, attachments, dark mode | Not started |
 | 9 | README in English | Not started |
 

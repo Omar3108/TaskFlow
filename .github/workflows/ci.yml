@@ -148,16 +148,23 @@ jobs:
             echo "::notice::Deployment is not configured (secret RENDER_DEPLOY_HOOK_URL, variable API_URL). Skipping."
             exit 0
           fi
+          # Tolerate a trailing slash or stray whitespace in the variable: "//actuator/info" is
+          # rejected by Spring Security and would look like "version unknown" forever.
+          API_URL=$(printf '%s' "$API_URL" | tr -d '[:space:]')
+          API_URL=${API_URL%/}
           curl -fsS -X POST "$DEPLOY_HOOK" > /dev/null
           # Health alone would pass on the old version; wait until /actuator/info reports this commit.
-          for attempt in $(seq 1 60); do
-            commit=$(curl -fsS "$API_URL/actuator/info" | jq -r '.app.commit // empty' || true)
+          # Render builds the image and the free instance needs ~3 minutes to start: allow 15.
+          for attempt in $(seq 1 90); do
+            status=$(curl -sS -m 30 -o info.json -w '%{http_code}' "$API_URL/actuator/info" || true)
+            commit=$(jq -r '.app.commit // empty' info.json 2>/dev/null || true)
+            echo "Attempt $attempt: HTTP ${status:-none}, serving ${commit:-unknown}"
             if [ "$commit" = "$GITHUB_SHA" ]; then
               echo "Version $commit is live."
-              curl -fsS "$API_URL/actuator/health"
+              curl -fsS -m 30 "$API_URL/actuator/health"
               exit 0
             fi
             sleep 10
           done
-          echo "::error::Commit $GITHUB_SHA was not live after 10 minutes (still serving: ${commit:-unknown})."
+          echo "::error::Commit $GITHUB_SHA was not live after 15 minutes (last answer: HTTP ${status:-none}, serving ${commit:-unknown})."
           exit 1
